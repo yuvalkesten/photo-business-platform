@@ -4,8 +4,9 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { useTransition } from "react"
-import { ProjectType, ProjectStatus, type Project, type Contact, type Organization } from "@prisma/client"
+import { ProjectType, ProjectStatus, type Contact, type Organization } from "@prisma/client"
 import { projectSchema, type ProjectFormData } from "@/lib/validations/project.schema"
+import { type SerializedProject } from "@/types/serialized"
 import { createProject } from "@/actions/projects/create-project"
 import { updateProject } from "@/actions/projects/update-project"
 import { Button } from "@/components/ui/button"
@@ -23,7 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 
 interface ProjectFormProps {
-  project?: Project & { contact?: Contact | null; organization?: Organization | null }
+  project?: SerializedProject & { contact?: Contact | null; organization?: Organization | null }
   contacts: Contact[]
   organizations: Organization[]
   defaultContactId?: string
