@@ -49,6 +49,20 @@
 - Status-based color coding (scheduled, completed, rescheduled, cancelled)
 - Synced with Google Calendar in real-time
 
+### Gmail Integration (Jan 10, 2026)
+20. Created Gmail API library (`/src/lib/google/gmail.ts`) with OAuth token management
+21. Added professional HTML email templates for:
+    - **Booking Confirmation**: Sent automatically when project status → BOOKED
+    - **Gallery Ready**: Sent manually via "Send to Client" button
+22. Added `SendGalleryButton` component on gallery detail page
+23. Emails use photographer's business name/email from user profile
+
+**Email Features:**
+- Automatic booking confirmation with project details, pricing, sessions
+- Gallery notification with share link, photo count, expiration date
+- Professional HTML templates with plain text fallback
+- Uses existing Google OAuth tokens (gmail.send scope already configured)
+
 ## Technical Architecture
 - **Auth:** NextAuth v5 with Google OAuth + Credentials provider
 - **Database:** Neon PostgreSQL with Prisma ORM
@@ -81,6 +95,8 @@ https://photo-business-platform.vercel.app/api/auth/callback/google
 - Calendar view: `/src/app/dashboard/calendar/page.tsx`
 - Calendar component: `/src/components/features/calendar/CalendarView.tsx`
 - Google Calendar lib: `/src/lib/google/calendar.ts`
+- Gmail lib: `/src/lib/google/gmail.ts`
+- Email templates: `/src/lib/email/templates/`
 
 ## Useful Commands
 ```bash
