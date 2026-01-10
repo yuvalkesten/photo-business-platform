@@ -1,39 +1,17 @@
 import NextAuth from "next-auth"
-import Google from "next-auth/providers/google"
 import Credentials from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma/client"
 import { compare } from "bcryptjs"
 import type { Adapter } from "next-auth/adapters"
+import { authConfig } from "@/lib/auth/auth.config"
 
+// Full auth config with Prisma adapter (used in API routes, not middleware)
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(prisma) as Adapter,
-  session: {
-    strategy: "jwt",
-  },
-  pages: {
-    signIn: "/auth/signin",
-    signOut: "/auth/signout",
-    error: "/auth/error",
-  },
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          scope: [
-            "openid",
-            "email",
-            "profile",
-            "https://www.googleapis.com/auth/calendar",
-            "https://www.googleapis.com/auth/gmail.send"
-          ].join(" "),
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    }),
+    ...authConfig.providers,
     Credentials({
       name: "credentials",
       credentials: {
@@ -71,27 +49,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id ?? ""
-        token.role = (user as { role?: string }).role ?? ""
-      }
-
-      // Store access token for Google APIs
-      if (account?.provider === "google") {
-        token.accessToken = account.access_token
-        token.refreshToken = account.refresh_token
-      }
-
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-      }
-      return session
-    },
-  },
 })
