@@ -47,7 +47,8 @@ export const updateSessionStatusSchema = z.object({
   status: z.nativeEnum(PhotoSessionStatus),
 })
 
-export type PhotoSessionFormData = z.infer<typeof photoSessionSchema>
+// Form data type with optional defaults
+export type PhotoSessionFormData = z.input<typeof photoSessionSchema>
 export type CreatePhotoSessionData = z.infer<typeof createPhotoSessionSchema>
 export type UpdatePhotoSessionData = z.infer<typeof updatePhotoSessionSchema>
 export type UpdateSessionStatusData = z.infer<typeof updateSessionStatusSchema>

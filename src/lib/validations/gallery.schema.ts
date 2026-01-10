@@ -24,6 +24,7 @@ export const createGallerySchema = gallerySchema
 
 export const updateGallerySchema = gallerySchema.partial()
 
-export type GalleryFormData = z.infer<typeof gallerySchema>
+// Form data type with optional defaults
+export type GalleryFormData = z.input<typeof gallerySchema>
 export type CreateGalleryData = z.infer<typeof createGallerySchema>
 export type UpdateGalleryData = z.infer<typeof updateGallerySchema>

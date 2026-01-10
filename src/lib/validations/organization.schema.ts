@@ -24,6 +24,7 @@ export const createOrganizationSchema = organizationSchema
 
 export const updateOrganizationSchema = organizationSchema.partial()
 
-export type OrganizationFormData = z.infer<typeof organizationSchema>
+// Form data type with optional defaults
+export type OrganizationFormData = z.input<typeof organizationSchema>
 export type CreateOrganizationData = z.infer<typeof createOrganizationSchema>
 export type UpdateOrganizationData = z.infer<typeof updateOrganizationSchema>

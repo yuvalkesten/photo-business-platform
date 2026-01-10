@@ -81,7 +81,8 @@ export const markAsLostSchema = z.object({
   lostNotes: z.string().optional(),
 })
 
-export type ProjectFormData = z.infer<typeof projectSchema>
+// Form data type with optional defaults
+export type ProjectFormData = z.input<typeof projectSchema>
 export type CreateProjectData = z.infer<typeof createProjectSchema>
 export type UpdateProjectData = z.infer<typeof updateProjectSchema>
 export type UpdateProjectStatusData = z.infer<typeof updateProjectStatusSchema>
