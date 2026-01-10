@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { LeadCard } from "./LeadCard"
-import { type SerializedSerializedLeadWithRelations } from "@/types/serialized"
+import { type SerializedLeadWithRelations } from "@/types/serialized"
 
 interface LeadKanbanProps {
-  leads: SerializedSerializedLeadWithRelations[]
+  leads: SerializedLeadWithRelations[]
   onConvertToBooked?: (leadId: string) => void
 }
 
