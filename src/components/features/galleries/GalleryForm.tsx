@@ -4,7 +4,14 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { useTransition } from "react"
-import { type Gallery, type Contact, type Project } from "@prisma/client"
+import { type Gallery, type Contact } from "@prisma/client"
+
+// Serialized project type (Decimal fields converted to number)
+type SerializedProject = {
+  id: string
+  name: string
+  [key: string]: unknown
+}
 import { gallerySchema, type GalleryFormData } from "@/lib/validations/gallery.schema"
 import { createGallery } from "@/actions/galleries/create-gallery"
 import { updateGallery } from "@/actions/galleries/update-gallery"
@@ -25,7 +32,7 @@ import { useToast } from "@/hooks/use-toast"
 
 interface GalleryFormProps {
   gallery?: Gallery
-  projects: Project[]
+  projects: SerializedProject[]
   contacts: Contact[]
   defaultProjectId?: string
   defaultContactId?: string

@@ -2,26 +2,17 @@
 
 import { useState, useTransition } from "react"
 import Link from "next/link"
-import { ProjectStatus, type Project, type Contact, type Organization, type PhotoSession } from "@prisma/client"
+import { ProjectStatus } from "@prisma/client"
 import { updateProjectStatus } from "@/actions/projects/update-project-status"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { Calendar, DollarSign, User } from "lucide-react"
-
-type ProjectWithRelations = Project & {
-  contact: Pick<Contact, "id" | "firstName" | "lastName" | "email" | "phone">
-  organization?: Pick<Organization, "id" | "name"> | null
-  sessions?: PhotoSession[]
-  _count?: {
-    sessions: number
-    galleries: number
-  }
-}
+import { type SerializedProjectWithRelations } from "@/types/serialized"
 
 interface ProjectKanbanProps {
-  projects: ProjectWithRelations[]
+  projects: SerializedProjectWithRelations[]
 }
 
 // Project statuses only - leads (INQUIRY, PROPOSAL_SENT) are shown in the Leads page
@@ -46,7 +37,7 @@ const projectTypeColors: Record<string, string> = {
   OTHER: "bg-slate-100 text-slate-800",
 }
 
-function ProjectCard({ project }: { project: ProjectWithRelations }) {
+function ProjectCard({ project }: { project: SerializedProjectWithRelations }) {
   const nextSession = project.sessions?.[0]
 
   return (
@@ -100,7 +91,7 @@ function KanbanColumn({
   status: ProjectStatus
   label: string
   color: string
-  projects: ProjectWithRelations[]
+  projects: SerializedProjectWithRelations[]
   onDrop: (projectId: string, newStatus: ProjectStatus) => void
 }) {
   const [isDragOver, setIsDragOver] = useState(false)
@@ -198,7 +189,7 @@ export function ProjectKanban({ projects }: ProjectKanbanProps) {
   const projectsByStatus = kanbanColumns.reduce((acc, col) => {
     acc[col.status] = localProjects.filter((p) => p.status === col.status)
     return acc
-  }, {} as Record<ProjectStatus, ProjectWithRelations[]>)
+  }, {} as Record<ProjectStatus, SerializedProjectWithRelations[]>)
 
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">

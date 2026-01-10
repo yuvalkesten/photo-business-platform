@@ -2,28 +2,16 @@
 
 import { useState, useTransition } from "react"
 import Link from "next/link"
-import {
-  ProjectStatus,
-  type Project,
-  type Contact,
-  type Organization,
-  LeadTemperature,
-} from "@prisma/client"
+import { ProjectStatus, LeadTemperature } from "@prisma/client"
 import { updateProjectStatus } from "@/actions/projects/update-project-status"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/hooks/use-toast"
 import { LeadCard } from "./LeadCard"
-
-type LeadWithRelations = Project & {
-  contact: Pick<Contact, "id" | "firstName" | "lastName" | "email" | "phone" | "type">
-  organization: Pick<Organization, "id" | "name"> | null
-  sessions: Array<{ id: string; title: string; scheduledAt: Date }>
-  _count: { sessions: number; galleries: number }
-}
+import { type SerializedSerializedLeadWithRelations } from "@/types/serialized"
 
 interface LeadKanbanProps {
-  leads: LeadWithRelations[]
+  leads: SerializedSerializedLeadWithRelations[]
   onConvertToBooked?: (leadId: string) => void
 }
 
@@ -42,7 +30,7 @@ function KanbanColumn({
   status: ProjectStatus
   label: string
   color: string
-  leads: LeadWithRelations[]
+  leads: SerializedLeadWithRelations[]
   onDrop: (leadId: string, newStatus: ProjectStatus) => void
 }) {
   const [isDragOver, setIsDragOver] = useState(false)
@@ -202,7 +190,7 @@ export function LeadKanban({ leads, onConvertToBooked }: LeadKanbanProps) {
       acc[col.status] = localLeads.filter((l) => l.status === col.status)
       return acc
     },
-    {} as Record<ProjectStatus, LeadWithRelations[]>
+    {} as Record<ProjectStatus, SerializedLeadWithRelations[]>
   )
 
   return (

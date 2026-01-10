@@ -1,6 +1,6 @@
 "use client"
 
-import { type Project, type Contact, type Organization, LeadTemperature, ProjectType } from "@prisma/client"
+import { LeadTemperature, ProjectType } from "@prisma/client"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -12,16 +12,10 @@ import {
   Clock,
   AlertCircle,
 } from "lucide-react"
-
-type LeadWithRelations = Project & {
-  contact: Pick<Contact, "id" | "firstName" | "lastName" | "email" | "phone" | "type">
-  organization: Pick<Organization, "id" | "name"> | null
-  sessions: Array<{ id: string; title: string; scheduledAt: Date }>
-  _count: { sessions: number; galleries: number }
-}
+import { type SerializedLeadWithRelations } from "@/types/serialized"
 
 interface LeadCardProps {
-  lead: LeadWithRelations
+  lead: SerializedLeadWithRelations
   onDragStart?: (e: React.DragEvent) => void
   draggable?: boolean
 }
