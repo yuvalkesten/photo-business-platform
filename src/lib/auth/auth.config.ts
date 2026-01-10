@@ -4,9 +4,10 @@ import Credentials from "next-auth/providers/credentials"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma/client"
 import { compare } from "bcryptjs"
+import type { Adapter } from "next-auth/adapters"
 
 export const authConfig: NextAuthConfig = {
-  adapter: PrismaAdapter(prisma),
+  adapter: PrismaAdapter(prisma) as Adapter,
   session: {
     strategy: "jwt",
   },
@@ -73,8 +74,8 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     async jwt({ token, user, account }) {
       if (user) {
-        token.id = user.id
-        token.role = user.role
+        token.id = user.id ?? ""
+        token.role = (user as { role?: string }).role ?? ""
       }
 
       // Store access token for Google APIs

@@ -49,7 +49,7 @@ const budgetRefinement = (data: { budgetMin?: number; budgetMax?: number }) => {
 
 const budgetRefinementConfig = {
   message: "Maximum budget must be greater than or equal to minimum budget",
-  path: ["budgetMax"] as const,
+  path: ["budgetMax"],
 }
 
 // Full schema with refinements (for create)

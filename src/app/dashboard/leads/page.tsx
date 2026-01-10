@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useState, useTransition, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { LeadTemperature } from "@prisma/client"
@@ -149,7 +149,7 @@ function StatsCards({ stats, isLoading }: { stats: LeadsStats | null; isLoading:
   )
 }
 
-export default function LeadsPage() {
+function LeadsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -413,5 +413,13 @@ export default function LeadsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense fallback={<LeadsLoading />}>
+      <LeadsContent />
+    </Suspense>
   )
 }

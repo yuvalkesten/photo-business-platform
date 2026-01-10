@@ -49,7 +49,7 @@ const sessionFormSchema = z.object({
   status: z.nativeEnum(PhotoSessionStatus).default(PhotoSessionStatus.SCHEDULED),
 })
 
-type SessionFormData = z.infer<typeof sessionFormSchema>
+type SessionFormData = z.input<typeof sessionFormSchema>
 
 function formatDateForInput(date: Date): string {
   return date.toISOString().split("T")[0]

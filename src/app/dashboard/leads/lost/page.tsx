@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useState, useTransition, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { LostReason } from "@prisma/client"
@@ -198,7 +198,7 @@ function formatDate(date: Date | string): string {
   })
 }
 
-export default function LostLeadsPage() {
+function LostLeadsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -440,5 +440,13 @@ export default function LostLeadsPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function LostLeadsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <LostLeadsContent />
+    </Suspense>
   )
 }
