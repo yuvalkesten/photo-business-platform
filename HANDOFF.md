@@ -5,18 +5,33 @@
 - Google OAuth login is functional
 - Database connection is working
 - All environment variables are properly configured
+- **Gallery photos are populated with demo images**
+- **S3 bucket configured for public read access**
 
 ## Live URLs
 - **Production:** https://photo-business-platform.vercel.app
 - **GitHub:** https://github.com/yuvalkesten/photo-business-platform
 
 ## What Was Done
+
+### Initial Setup (Previous Sessions)
 1. Set up GitHub repo and deployed to Vercel
 2. Fixed multiple TypeScript build errors (Suspense boundaries, serialized types, etc.)
 3. Fixed middleware edge function size issue (split auth config into edge-compatible version)
 4. Fixed GOOGLE_CLIENT_ID newline issue in Vercel env var
 5. Re-added clean env vars: DATABASE_URL, GOOGLE_CLIENT_SECRET, NEXTAUTH_SECRET
 6. Redeployed to apply environment variable changes - **this fixed the Configuration error**
+
+### Gallery Photos Session (Jan 10, 2026)
+7. Added demo photos to all 3 mock galleries:
+   - **Nakamura Family Portraits**: 3 family photos
+   - **Baby Garcia - Newborn Session**: 3 newborn photos
+   - **Amanda & Josh - Engagement**: 3 engagement photos
+8. Created `prisma/seed-photos.ts` script to populate galleries with Unsplash photos
+9. Created `scripts/fix-s3-permissions.ts` to configure S3 bucket policy for public access
+10. Fixed S3 bucket permissions - added public read policy for `galleries/*` path
+11. Fixed gallery share URL to use production domain (`NEXTAUTH_URL`) instead of localhost
+12. Added `@google/genai` and `tsx` dependencies (for future AI image generation)
 
 ## Technical Architecture
 - **Auth:** NextAuth v5 with Google OAuth + Credentials provider

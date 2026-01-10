@@ -143,3 +143,26 @@ export async function deleteCalendarEvent(userId: string, eventId: string) {
 
   return { success: true }
 }
+
+export interface ListCalendarEventsParams {
+  timeMin: Date
+  timeMax: Date
+}
+
+export async function listCalendarEvents(
+  userId: string,
+  params: ListCalendarEventsParams
+) {
+  const calendar = await getCalendarClient(userId)
+
+  const response = await calendar.events.list({
+    calendarId: "primary",
+    timeMin: params.timeMin.toISOString(),
+    timeMax: params.timeMax.toISOString(),
+    singleEvents: true,
+    orderBy: "startTime",
+    maxResults: 500,
+  })
+
+  return response.data.items || []
+}
