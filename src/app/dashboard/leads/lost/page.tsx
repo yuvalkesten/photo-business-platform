@@ -48,8 +48,29 @@ import {
   Briefcase,
 } from "lucide-react"
 
-type LostLead = Awaited<ReturnType<typeof getLostLeads>> extends { lostLeads: infer T } ? T : never
-type LostLeadItem = LostLead extends (infer U)[] ? U : never
+// Define the lost lead item type explicitly
+interface LostLeadItem {
+  id: string
+  name: string
+  createdAt: Date
+  updatedAt: Date
+  lostReason: LostReason | null
+  lostNotes: string | null
+  eventDate: Date | null
+  budgetMin: number | null
+  budgetMax: number | null
+  contact: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  } | null
+  organization: {
+    id: string
+    name: string
+  } | null
+  [key: string]: unknown
+}
 
 interface LostLeadsStats {
   total: number
