@@ -33,6 +33,22 @@
 11. Fixed gallery share URL to use production domain (`NEXTAUTH_URL`) instead of localhost
 12. Added `@google/genai` and `tsx` dependencies (for future AI image generation)
 
+### Calendar Feature (Jan 10, 2026)
+13. Added Google Calendar-synced calendar view at `/dashboard/calendar`
+14. Installed FullCalendar packages for Month/Week/Day views
+15. Created `CalendarView` component with shadcn/ui styling
+16. Created `QuickAddSessionSheet` for quick session creation from calendar
+17. Added `listCalendarEvents` function to fetch events from Google Calendar API
+18. Created server actions: `getCalendarEvents`, `getProjectsForCalendar`
+19. Updated dashboard navigation to include Calendar link
+
+**Calendar Features:**
+- Month, Week, and Day views
+- Click on any date/time to quick-add a new session
+- Events display with project names and contact info
+- Status-based color coding (scheduled, completed, rescheduled, cancelled)
+- Synced with Google Calendar in real-time
+
 ## Technical Architecture
 - **Auth:** NextAuth v5 with Google OAuth + Credentials provider
 - **Database:** Neon PostgreSQL with Prisma ORM
@@ -62,6 +78,9 @@ https://photo-business-platform.vercel.app/api/auth/callback/google
 - Auth config: `/src/auth.ts` and `/src/lib/auth/auth.config.ts`
 - API route: `/src/app/api/auth/[...nextauth]/route.ts`
 - Middleware: `/src/middleware.ts`
+- Calendar view: `/src/app/dashboard/calendar/page.tsx`
+- Calendar component: `/src/components/features/calendar/CalendarView.tsx`
+- Google Calendar lib: `/src/lib/google/calendar.ts`
 
 ## Useful Commands
 ```bash
