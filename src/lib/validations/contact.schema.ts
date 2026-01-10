@@ -33,6 +33,7 @@ export const createContactSchema = contactSchema
 
 export const updateContactSchema = contactSchema.partial()
 
-export type ContactFormData = z.infer<typeof contactSchema>
+// Form data type with optional defaults
+export type ContactFormData = z.input<typeof contactSchema>
 export type CreateContactData = z.infer<typeof createContactSchema>
 export type UpdateContactData = z.infer<typeof updateContactSchema>
