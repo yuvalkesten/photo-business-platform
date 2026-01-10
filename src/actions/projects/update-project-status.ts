@@ -5,6 +5,8 @@ import { requireAuth } from "@/lib/auth/utils"
 import { prisma } from "@/lib/db"
 import { updateProjectStatusSchema } from "@/lib/validations/project.schema"
 import { ProjectStatus, ContactType } from "@prisma/client"
+import { sendEmail } from "@/lib/google/gmail"
+import { generateBookingConfirmationEmail } from "@/lib/email/templates"
 
 export async function updateProjectStatus(projectId: string, data: unknown) {
   try {
@@ -83,6 +85,61 @@ export async function updateProjectStatus(projectId: string, data: unknown) {
         data: { type: ContactType.CLIENT },
       })
       revalidatePath("/dashboard/contacts")
+    }
+
+    // Send booking confirmation email when project is booked
+    if (isConvertingToBooked && project.contact.email) {
+      try {
+        // Get photographer info
+        const photographer = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: {
+            name: true,
+            email: true,
+            businessName: true,
+            businessEmail: true,
+            businessPhone: true,
+          },
+        })
+
+        // Get scheduled sessions for this project
+        const sessions = await prisma.photoSession.findMany({
+          where: { projectId: project.id },
+          orderBy: { scheduledAt: "asc" },
+        })
+
+        const emailData = {
+          clientName: `${project.contact.firstName} ${project.contact.lastName}`,
+          projectName: project.name,
+          projectType: project.projectType,
+          totalPrice: project.totalPrice ? Number(project.totalPrice) : null,
+          deposit: project.deposit ? Number(project.deposit) : null,
+          eventDate: project.eventDate,
+          sessions: sessions.map((s) => ({
+            title: s.title,
+            date: s.scheduledAt,
+            startTime: s.startTime,
+            location: s.location,
+          })),
+          photographerName: photographer?.businessName || photographer?.name || "Your Photographer",
+          photographerEmail: photographer?.businessEmail || photographer?.email || "",
+          photographerPhone: photographer?.businessPhone || null,
+        }
+
+        const { subject, htmlBody, textBody } = generateBookingConfirmationEmail(emailData)
+
+        await sendEmail(user.id, {
+          to: project.contact.email,
+          subject,
+          htmlBody,
+          textBody,
+        })
+
+        console.log(`Booking confirmation email sent to ${project.contact.email}`)
+      } catch (emailError) {
+        // Log error but don't fail the status update
+        console.error("Failed to send booking confirmation email:", emailError)
+      }
     }
 
     revalidatePath("/dashboard/projects")

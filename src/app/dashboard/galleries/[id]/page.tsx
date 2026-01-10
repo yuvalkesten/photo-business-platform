@@ -22,6 +22,7 @@ import {
   Copy,
   ExternalLink,
 } from "lucide-react"
+import { SendGalleryButton } from "@/components/features/galleries/SendGalleryButton"
 
 interface GalleryDetailPageProps {
   params: Promise<{ id: string }>
@@ -126,12 +127,19 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
-              <Button variant="outline" className="w-full" asChild>
-                <a href={shareUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open Gallery
-                </a>
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" asChild>
+                  <a href={shareUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Gallery
+                  </a>
+                </Button>
+                <SendGalleryButton
+                  galleryId={id}
+                  contactEmail={gallery.contact.email || ""}
+                  photoCount={gallery.photos?.length || 0}
+                />
+              </div>
             </CardContent>
           </Card>
 
