@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { LeadTemperature } from "@prisma/client"
 import { getLeads } from "@/actions/leads"
 import { convertToBooked } from "@/actions/leads"
+import { type SerializedLeadWithRelations } from "@/types/serialized"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -40,8 +41,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 
-type Lead = Awaited<ReturnType<typeof getLeads>> extends { leads: infer T } ? T : never
-type LeadItem = Lead extends (infer U)[] ? U : never
+// Use the serialized type for leads
+type LeadItem = SerializedLeadWithRelations
 
 interface LeadsStats {
   total: number
