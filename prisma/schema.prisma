@@ -1,0 +1,410 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== AUTH MODELS ====================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // For email/password auth
+  role          UserRole  @default(PHOTOGRAPHER)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  contacts      Contact[]
+  organizations Organization[]
+  projects      Project[]
+  galleries     Gallery[]
+
+  // Settings
+  businessName    String?
+  businessLogo    String?
+  businessEmail   String?
+  businessPhone   String?
+  timezone        String   @default("America/New_York")
+
+  @@map("users")
+}
+
+enum UserRole {
+  PHOTOGRAPHER
+  ADMIN
+  CLIENT
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.Text
+  access_token      String?  @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ==================== CRM MODELS ====================
+
+model Contact {
+  id        String   @id @default(cuid())
+  userId    String   // Photographer who owns this contact
+
+  // Basic Info
+  firstName String
+  lastName  String
+  email     String
+  phone     String?
+
+  // Organization
+  organizationId String?     // Optional link to Organization
+  jobTitle       String?     // Their role (e.g., "Event Coordinator")
+
+  // Additional Info
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  website   String?
+
+  // Categorization
+  type      ContactType   @default(LEAD)
+  source    String?       // How they found you (referral, Instagram, etc.)
+  tags      String[]      // Flexible tagging
+
+  // Status & Notes
+  status    ContactStatus @default(ACTIVE)
+  notes     String?       @db.Text
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  projects     Project[]
+  galleries    Gallery[]
+
+  @@unique([userId, email])
+  @@index([userId, type])
+  @@index([userId, status])
+  @@index([organizationId])
+  @@map("contacts")
+}
+
+enum ContactType {
+  LEAD              // Potential client (inquired but not booked)
+  CLIENT            // Active client (has ongoing projects)
+  PAST_CLIENT       // Former client (all projects completed)
+  COLLABORATOR      // Other photographer, assistant, second shooter
+  SUPPLIER          // Venue, vendor, printer, etc.
+  REFERRAL_SOURCE   // Someone who sends clients your way
+}
+
+enum ContactStatus {
+  ACTIVE      // Currently engaged
+  INACTIVE    // Haven't heard from in a while
+  ARCHIVED    // No longer relevant
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  userId    String   // Photographer who owns this org
+
+  // Basic Info
+  name      String
+  type      OrgType?         // Company, NGO, Venue, etc.
+  website   String?
+  email     String?
+  phone     String?
+
+  // Address
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+
+  // Additional
+  notes     String?  @db.Text
+  tags      String[]
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacts  Contact[] // People who work at this org
+  projects  Project[] // Projects directly with this org
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("organizations")
+}
+
+enum OrgType {
+  COMPANY
+  NGO
+  VENUE
+  VENDOR
+  AGENCY
+  OTHER
+}
+
+// ==================== PROJECT MODELS ====================
+
+model Project {
+  id             String   @id @default(cuid())
+  userId         String   // Photographer
+  contactId      String   // Primary contact
+  organizationId String?  // Optional organization (for corporate projects)
+
+  // Project Details
+  name          String    // e.g., "Sarah & Mike's Wedding"
+  description   String?   @db.Text
+  projectType   ProjectType
+
+  // Workflow Stage
+  status        ProjectStatus @default(INQUIRY)
+
+  // Financial
+  totalPrice    Decimal?  @db.Decimal(10, 2)
+  deposit       Decimal?  @db.Decimal(10, 2)
+  paidAmount    Decimal?  @db.Decimal(10, 2)
+
+  // Additional Info
+  source        String?   // How they found you
+  notes         String?   @db.Text
+  tags          String[]
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  completedAt   DateTime?
+
+  // CRM Lead Fields (primarily for INQUIRY/PROPOSAL_SENT stages)
+  budgetMin         Decimal?         @db.Decimal(10, 2)
+  budgetMax         Decimal?         @db.Decimal(10, 2)
+  leadTemperature   LeadTemperature?
+  nextFollowUpDate  DateTime?
+  lastContactDate   DateTime?
+  expectedCloseDate DateTime?
+  closeProbability  Int?             @default(50) // 0-100% likelihood
+  eventDate         DateTime?        // When is the event (needed at lead stage)
+  lostReason        LostReason?
+  lostNotes         String?          @db.Text
+  bookedAt          DateTime?        // When status changed to BOOKED
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact       Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organization  Organization? @relation(fields: [organizationId], references: [id])
+  sessions      PhotoSession[]
+  galleries     Gallery[]
+
+  @@index([userId, status])
+  @@index([contactId])
+  @@index([organizationId])
+  @@index([userId, leadTemperature])
+  @@index([userId, nextFollowUpDate])
+  @@index([userId, eventDate])
+  @@map("projects")
+}
+
+enum ProjectType {
+  WEDDING
+  ENGAGEMENT
+  PORTRAIT
+  FAMILY
+  NEWBORN
+  CORPORATE
+  EVENT
+  COMMERCIAL
+  REAL_ESTATE
+  OTHER
+}
+
+enum ProjectStatus {
+  INQUIRY         // Initial contact, not booked yet
+  PROPOSAL_SENT   // Quote/proposal sent
+  BOOKED          // Contract signed, deposit paid
+  IN_PROGRESS     // Actively working (shoots happening)
+  POST_PRODUCTION // Editing photos
+  DELIVERED       // Photos delivered to client
+  COMPLETED       // Everything done, paid in full
+  CANCELLED       // Project cancelled
+  ARCHIVED        // Old project, no longer relevant
+}
+
+enum LeadTemperature {
+  HOT       // High likelihood, responding quickly
+  WARM      // Interested, moderate engagement
+  COLD      // Low engagement, needs nurturing
+}
+
+enum LostReason {
+  BUDGET              // Price too high
+  TIMING              // Date not available
+  COMPETITOR          // Chose another photographer
+  NO_RESPONSE         // Client went silent
+  SCOPE_MISMATCH      // Requirements didn't fit
+  PERSONAL_REASONS    // Client circumstances
+  OTHER               // See notes
+}
+
+model PhotoSession {
+  id        String   @id @default(cuid())
+  projectId String
+
+  // Session Details
+  title         String    // e.g., "Engagement Shoot" or "Wedding Day"
+  description   String?   @db.Text
+
+  // Date & Time
+  scheduledAt   DateTime
+  startTime     DateTime
+  endTime       DateTime
+  timezone      String    @default("America/New_York")
+
+  // Location
+  location      String?
+  locationNotes String?   @db.Text
+
+  // Google Calendar Integration
+  googleEventId    String? @unique
+  googleCalendarId String?
+
+  // Status
+  status        PhotoSessionStatus @default(SCHEDULED)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([scheduledAt])
+  @@map("photo_sessions")
+}
+
+enum PhotoSessionStatus {
+  SCHEDULED
+  COMPLETED
+  RESCHEDULED
+  CANCELLED
+}
+
+// ==================== GALLERY MODELS ====================
+
+model Gallery {
+  id        String   @id @default(cuid())
+  userId    String   // Photographer
+  projectId String   // Which project
+  contactId String   // Primary contact (for access)
+
+  // Details
+  title       String
+  description String?  @db.Text
+  coverImage  String?  // URL to cover image
+
+  // Access Control
+  isPublic    Boolean  @default(false)
+  password    String?  // Hashed password for protected galleries
+  shareToken  String   @unique @default(cuid()) // Unique token for sharing
+  expiresAt   DateTime? // Optional expiration
+
+  // Settings
+  allowDownload Boolean @default(true)
+  watermark     Boolean @default(false)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contact   Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  photos    Photo[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([contactId])
+  @@index([shareToken])
+  @@map("galleries")
+}
+
+model Photo {
+  id        String   @id @default(cuid())
+  galleryId String
+
+  // File Info
+  filename    String
+  s3Key       String   @unique  // Full S3 key
+  s3Url       String            // CloudFront URL
+  thumbnailUrl String?          // Thumbnail URL
+
+  // Metadata
+  fileSize    Int               // in bytes
+  width       Int
+  height      Int
+  mimeType    String
+
+  // Organization
+  order       Int      @default(0)
+  isFavorite  Boolean  @default(false)
+  tags        String[]
+
+  // Timestamps
+  uploadedAt DateTime @default(now())
+
+  // Relations
+  gallery    Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@index([galleryId, order])
+  @@map("photos")
+}
