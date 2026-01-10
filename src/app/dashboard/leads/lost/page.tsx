@@ -384,10 +384,10 @@ export default function LostLeadsPage() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            {lead.contact.firstName} {lead.contact.lastName}
+                            {lead.contact?.firstName} {lead.contact?.lastName}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {lead.contact.email}
+                            {lead.contact?.email}
                           </div>
                         </TableCell>
                         <TableCell>
