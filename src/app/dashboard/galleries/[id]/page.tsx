@@ -39,7 +39,9 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
   }
 
   const { gallery } = result
-  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/gallery/${gallery.shareToken}`
+  // Use NEXTAUTH_URL for production, fall back to NEXT_PUBLIC_APP_URL or localhost
+  const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const shareUrl = `${baseUrl}/gallery/${gallery.shareToken}`
 
   async function handleDelete() {
     "use server"
