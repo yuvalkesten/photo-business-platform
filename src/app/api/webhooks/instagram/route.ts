@@ -10,10 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
-import {
-  InstagramWebhookPayload,
-  InstagramError,
-} from "@/lib/instagram/types";
+import { InstagramWebhookPayload } from "@/lib/instagram/types";
 
 // Environment variables
 const INSTAGRAM_WEBHOOK_VERIFY_TOKEN = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
