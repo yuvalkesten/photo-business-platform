@@ -10,6 +10,26 @@ import { authConfig } from "@/lib/auth/auth.config"
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma) as Adapter,
+  events: {
+    // Update tokens when user signs in again (to get new scopes)
+    async signIn({ account, user }) {
+      if (account?.provider === "google" && user?.id) {
+        // Update the existing account with new tokens
+        await prisma.account.updateMany({
+          where: {
+            userId: user.id,
+            provider: "google",
+          },
+          data: {
+            access_token: account.access_token,
+            refresh_token: account.refresh_token ?? undefined,
+            expires_at: account.expires_at,
+            scope: account.scope,
+          },
+        })
+      }
+    },
+  },
   providers: [
     ...authConfig.providers,
     Credentials({

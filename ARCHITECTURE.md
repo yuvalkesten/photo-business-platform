@@ -49,767 +49,495 @@ Technical architecture and design decisions for the Photo Business Platform.
 ### Frontend
 
 **Framework:** Next.js 16 (App Router)
-- **Why:** Industry standard, excellent DX, built-in optimizations
-- **App Router:** Modern approach, RSC support, better performance
-- **TypeScript:** Type safety, better IDE support, fewer runtime errors
+- Server Components for static/dynamic rendering
+- Client Components for interactivity
+- Server Actions for mutations
+- Streaming and Suspense for loading states
 
-**UI Library:** React 18
-- **Server Components:** Default for pages, reduce client bundle
-- **Client Components:** Only when needed (interactivity)
+**UI Library:** shadcn/ui (Radix UI primitives)
+- Accessible, customizable components
+- Tailwind CSS styling
+- No runtime overhead
 
-**Styling:** Tailwind CSS 3
-- **Why:** Utility-first, mobile-first, highly customizable
-- **Design System:** Custom theme extending Tailwind defaults
-
-**Component Library:** shadcn/ui (Radix UI)
-- **Why:** Accessible, customizable, no runtime overhead
-- **Components:** Built on Radix primitives
-- **Not a library:** Copy-paste components (full control)
-- **CRITICAL:** ALL UI components MUST use shadcn/ui - no custom CSS/HTML components
-
-**Icons:** Lucide React
-- **Why:** Modern, tree-shakeable, MIT licensed
+**State Management:**
+- Server state via React Query (TanStack Query)
+- Client state via React hooks (useState, useContext)
+- Form state via React Hook Form
 
 ### Backend
 
 **Runtime:** Next.js API Routes & Server Actions
-- **API Routes:** REST endpoints, webhooks
-- **Server Actions:** Form mutations, direct from components
+- Server Actions for form mutations
+- API Routes for webhooks and file uploads
 
-**Database ORM:** Prisma
-- **Why:** Type-safe, great DX, migrations, Prisma Studio
-- **Database:** PostgreSQL (Neon - serverless)
+**Database:** PostgreSQL (Neon) + Prisma ORM
+- Serverless PostgreSQL with connection pooling
+- Type-safe database queries
+- Auto-generated migrations
 
 **Authentication:** NextAuth.js v5
-- **Why:** Industry standard for Next.js, supports multiple providers
-- **Providers:** Google OAuth (Calendar + Gmail), Email/Password
-- **Session:** JWT strategy
+- Google OAuth (primary)
+- Credentials provider (email/password fallback)
+- JWT session strategy
 
-### Data & State Management
+### External Services
 
-**Server State:** TanStack Query (React Query)
-- **Why:** Caching, background refetching, optimistic updates
-- **Use Cases:** API data, server state synchronization
+**AWS S3:** Photo storage
+- Direct upload via presigned URLs
+- Public read access for gallery photos
+- Organized by `galleries/{galleryId}/{filename}`
 
-**Client State:** Zustand
-- **Why:** Simple, minimal boilerplate, good TypeScript support
-- **Use Cases:** UI state, user preferences
+**Google Calendar API:** Schedule sync
+- Two-way sync for sessions
+- Create/update/delete events
+- Uses OAuth refresh tokens
 
-**Forms:** React Hook Form + Zod
-- **Why:** Performance, minimal re-renders, schema validation
-- **Validation:** Zod for runtime type safety
-
-### Storage & External Services
-
-**File Storage:** AWS S3
-- **Why:** Industry standard, scalable, cost-effective
-- **Strategy:** Direct uploads via presigned URLs
-- **CDN:** CloudFront (optional, for faster delivery)
-- **Processing:** Sharp for image optimization
-
-**Database:** Neon PostgreSQL
-- **Why:** Serverless, auto-scaling, generous free tier
-- **Region:** us-east-2 (same as S3)
-- **Connection:** Pooled for serverless compatibility
-
-**Calendar:** Google Calendar API
-- **Why:** Industry standard, user familiarity
-- **Integration:** Two-way sync (create, update, delete)
-
-**Email:** Gmail API
-- **Why:** Integrated with OAuth, user's own email
-- **Use Cases:** Client communication, notifications
-
-### DevOps & Deployment
-
-**Hosting:** Vercel
-- **Why:** Built by Next.js team, zero-config deployment
-- **Features:** Edge network, preview deployments, analytics
-- **CI/CD:** Auto-deploy from GitHub
-
-**Version Control:** Git + GitHub
-- **Why:** Industry standard, integrates with Vercel
+**Gmail API:** Client communication
+- Booking confirmation emails
+- Gallery notification emails
+- Uses OAuth access tokens
 
 ---
 
-## Database Schema Design
+## Database Schema
 
-### Entity Relationship Diagram
+### Core Models
 
+```prisma
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  businessName  String?
+  businessEmail String?
+  businessPhone String?
+  accounts      Account[]
+  contacts      Contact[]
+  projects      Project[]
+  galleries     Gallery[]
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  status    ContactStatus @default(LEAD)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  projects  Project[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  projectType ProjectType
+  status      ProjectStatus @default(INQUIRY)
+  totalPrice  Float?
+  deposit     Float?
+  contactId   String
+  contact     Contact       @relation(fields: [contactId], references: [id])
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  sessions    PhotoSession[]
+  galleries   Gallery[]
+}
+
+model PhotoSession {
+  id            String         @id @default(cuid())
+  title         String
+  startTime     DateTime
+  endTime       DateTime
+  location      String?
+  status        SessionStatus  @default(SCHEDULED)
+  googleEventId String?
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id])
+}
+
+model Gallery {
+  id            String    @id @default(cuid())
+  title         String
+  shareToken    String    @unique @default(cuid())
+  password      String?   // Hashed password for protection
+  allowDownload Boolean   @default(true)
+  expiresAt     DateTime?
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id])
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  photos        Photo[]
+}
+
+model Photo {
+  id           String  @id @default(cuid())
+  filename     String
+  s3Url        String
+  thumbnailUrl String?
+  width        Int?
+  height       Int?
+  galleryId    String
+  gallery      Gallery @relation(fields: [galleryId], references: [id])
+}
 ```
-┌─────────────┐
-│    User     │
-│ (Photogr.)  │
-└─────┬───────┘
-      │
-      │ 1:N
-      │
-      ├──────────┬──────────┬──────────┐
-      │          │          │          │
-  ┌───▼───┐  ┌──▼──┐  ┌────▼────┐ ┌──▼──┐
-  │Client │  │Book.│  │ Gallery │ │Acct │
-  └───┬───┘  └──┬──┘  └────┬────┘ └─────┘
-      │         │           │
-      │ 1:N     │ 1:1       │ 1:N
-      │         │           │
-      └────┬────┴───────┬───┘
-           │            │
-       ┌───▼───┐    ┌───▼───┐
-       │Gallery│    │ Photo │
-       └───────┘    └───────┘
+
+### Enums
+
+```prisma
+enum ContactStatus {
+  LEAD
+  ACTIVE
+  PAST
+  ARCHIVED
+}
+
+enum ProjectStatus {
+  INQUIRY
+  BOOKED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectType {
+  WEDDING
+  PORTRAIT
+  EVENT
+  COMMERCIAL
+  FAMILY
+  NEWBORN
+  ENGAGEMENT
+  OTHER
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  RESCHEDULED
+  CANCELLED
+}
 ```
-
-### Key Models
-
-**User**
-- Primary entity for photographers
-- Stores business settings (name, logo, email, phone)
-- Manages authentication via NextAuth
-
-**Account** (NextAuth)
-- OAuth provider accounts (Google)
-- Stores access/refresh tokens for Google APIs
-- One-to-many with User
-
-**Client**
-- CRM entity for photographer's clients
-- Status: LEAD → ACTIVE → PAST → ARCHIVED
-- Supports tagging and categorization
-
-**Booking**
-- Event/session scheduling
-- Integrates with Google Calendar (stores googleEventId)
-- Links to Client, optionally to Gallery
-- Pricing information (total price, deposit)
-
-**Gallery**
-- Container for photo collections
-- Access control (public/private, password, expiration)
-- Unique shareToken for public access
-- Links to Client and optional Booking
-
-**Photo**
-- Individual photos within Gallery
-- Stores S3 URLs (original + thumbnail)
-- Metadata (dimensions, file size, MIME type)
-- Organization (order, favorites, tags)
-
-### Indexing Strategy
-
-**Performance Indexes:**
-- `clients`: `[userId, status]`, `[userId, email]`
-- `bookings`: `[userId, startTime]`, `[userId, status]`, `[clientId]`
-- `galleries`: `[userId]`, `[clientId]`, `[shareToken]`
-- `photos`: `[galleryId, order]`
-
-**Why:** Optimize common queries (list by user, filter by status, sort by date)
 
 ---
 
 ## Application Structure
 
-### Directory Organization
-
 ```
 src/
 ├── app/                          # Next.js App Router
-│   ├── (auth)/                   # Auth group (layout)
-│   │   ├── signin/
-│   │   └── error/
-│   ├── dashboard/                # Protected routes
-│   │   ├── layout.tsx           # Dashboard shell
-│   │   ├── clients/             # CRM pages
-│   │   ├── bookings/            # Booking pages
-│   │   └── galleries/           # Gallery pages
-│   ├── gallery/[token]/         # Public gallery
-│   ├── api/                     # API routes
-│   │   ├── auth/[...nextauth]/  # NextAuth
-│   │   └── galleries/upload/    # File upload
+│   ├── api/
+│   │   ├── auth/[...nextauth]/  # NextAuth handler
+│   │   └── galleries/upload/    # Photo upload API
+│   ├── auth/
+│   │   ├── signin/              # Sign in page
+│   │   └── error/               # Auth error page
+│   ├── dashboard/
+│   │   ├── layout.tsx           # Dashboard shell with navigation
+│   │   ├── page.tsx             # Dashboard home
+│   │   ├── calendar/            # Calendar view
+│   │   ├── contacts/            # Contact CRUD pages
+│   │   ├── projects/            # Project CRUD pages
+│   │   └── galleries/           # Gallery CRUD pages
+│   ├── gallery/[token]/         # Public gallery view
 │   ├── layout.tsx               # Root layout
 │   └── page.tsx                 # Landing page
 │
-├── components/                   # React components
+├── actions/                      # Server Actions
+│   ├── contacts/                # Contact mutations
+│   ├── projects/                # Project mutations
+│   ├── sessions/                # Session mutations
+│   ├── galleries/               # Gallery mutations
+│   └── calendar/                # Calendar queries
+│
+├── components/
 │   ├── ui/                      # shadcn/ui components
-│   ├── layouts/                 # Layout components
-│   │   ├── MobileNav.tsx
-│   │   └── DesktopSidebar.tsx
+│   ├── providers/               # Context providers
 │   └── features/                # Feature components
-│       ├── clients/
-│       ├── bookings/
-│       └── galleries/
+│       ├── contacts/
+│       ├── projects/
+│       ├── sessions/
+│       ├── galleries/
+│       └── calendar/
 │
-├── lib/                         # Utilities & configs
-│   ├── auth/                    # Auth utilities
-│   │   ├── auth.config.ts
-│   │   └── utils.ts
-│   ├── prisma/                  # Prisma client
-│   │   └── client.ts
-│   ├── s3/                      # S3 utilities
-│   │   ├── client.ts
-│   │   ├── upload.ts
-│   │   └── presigned-url.ts
-│   ├── google/                  # Google APIs
-│   │   ├── calendar.ts
-│   │   └── gmail.ts
-│   └── validations/             # Zod schemas
-│       └── client.schema.ts
+├── lib/
+│   ├── auth/
+│   │   └── auth.config.ts       # NextAuth edge config
+│   ├── google/
+│   │   ├── calendar.ts          # Google Calendar API
+│   │   └── gmail.ts             # Gmail API
+│   ├── s3/
+│   │   ├── client.ts            # S3 client
+│   │   └── upload.ts            # Presigned URL generation
+│   ├── email/templates/         # HTML email templates
+│   ├── validations/             # Zod schemas
+│   └── db.ts                    # Prisma client
 │
-├── actions/                     # Server Actions
-│   ├── clients/
-│   │   ├── create-client.ts
-│   │   ├── update-client.ts
-│   │   └── delete-client.ts
-│   ├── bookings/
-│   └── galleries/
+├── types/                        # TypeScript types
+│   └── next-auth.d.ts           # NextAuth type extensions
 │
-├── hooks/                       # Custom React hooks
-├── types/                       # TypeScript types
-└── middleware.ts                # Next.js middleware
+├── auth.ts                       # NextAuth full config
+└── middleware.ts                 # Route protection
 ```
 
-### File Naming Conventions
+---
 
-- **Pages:** `page.tsx` (Next.js convention)
-- **Layouts:** `layout.tsx` (Next.js convention)
-- **Components:** `PascalCase.tsx` (e.g., `ClientForm.tsx`)
-- **Utilities:** `kebab-case.ts` (e.g., `auth.config.ts`)
-- **Server Actions:** `kebab-case.ts` (e.g., `create-client.ts`)
-- **Hooks:** `use-something.ts` (e.g., `use-client.ts`)
+## Authentication Architecture
+
+### Split Auth Configuration
+
+Due to Vercel's 1MB edge function limit, auth is split into two configs:
+
+**`/src/auth.ts`** - Full auth with Prisma adapter
+- Used in API routes and server actions
+- Includes Prisma adapter for database storage
+- Handles token storage and user creation
+
+**`/src/lib/auth/auth.config.ts`** - Edge-compatible config
+- Used in middleware
+- No Prisma (too large for edge)
+- Session validation only
+
+### OAuth Flow
+
+```
+1. User clicks "Sign in with Google"
+2. Redirect to Google OAuth consent
+3. User grants permissions (Calendar, Gmail)
+4. Callback to /api/auth/callback/google
+5. NextAuth creates/updates user and account
+6. Access token and refresh token stored
+7. JWT session created with user ID
+8. Redirect to /dashboard
+```
+
+### Google API Token Management
+
+```typescript
+// In server actions, get fresh access token
+const account = await prisma.account.findFirst({
+  where: { userId, provider: "google" }
+})
+
+// Use access_token for API calls
+// If expired, refresh using refresh_token
+```
+
+---
+
+## File Upload Architecture
+
+### S3 Direct Upload Flow
+
+```
+1. Client selects files
+2. Client requests presigned URL from API
+3. Server generates signed URL (expires in 1 hour)
+4. Client uploads directly to S3
+5. Client notifies server of upload completion
+6. Server creates Photo record with S3 URL
+```
+
+### S3 Bucket Structure
+
+```
+photo-business-uploads-yuval/
+└── galleries/
+    └── {galleryId}/
+        ├── original/
+        │   └── {filename}
+        └── thumbnails/
+            └── {filename}
+```
+
+---
+
+## Google Calendar Integration
+
+### Sync Strategy
+
+**Session Creation:**
+```typescript
+// 1. Create session in database
+const session = await prisma.photoSession.create(...)
+
+// 2. Create Google Calendar event
+const event = await calendar.events.insert({
+  calendarId: "primary",
+  requestBody: {
+    summary: session.title,
+    start: { dateTime: session.startTime },
+    end: { dateTime: session.endTime },
+    location: session.location
+  }
+})
+
+// 3. Store event ID for future updates
+await prisma.photoSession.update({
+  where: { id: session.id },
+  data: { googleEventId: event.data.id }
+})
+```
+
+**Calendar View:**
+```typescript
+// Fetch events from Google Calendar
+const googleEvents = await calendar.events.list({
+  calendarId: "primary",
+  timeMin: startDate.toISOString(),
+  timeMax: endDate.toISOString()
+})
+
+// Match with local sessions by googleEventId
+const sessions = await prisma.photoSession.findMany({
+  where: { googleEventId: { in: googleEventIds } }
+})
+```
+
+---
+
+## Gmail Integration
+
+### Email Sending Flow
+
+```typescript
+// 1. Get Gmail client with user's OAuth tokens
+const gmail = await getGmailClient(userId)
+
+// 2. Build MIME message
+const message = [
+  `To: ${to}`,
+  `Subject: ${subject}`,
+  `Content-Type: text/html; charset=utf-8`,
+  "",
+  htmlBody
+].join("\n")
+
+// 3. Send via Gmail API
+await gmail.users.messages.send({
+  userId: "me",
+  requestBody: {
+    raw: Buffer.from(message).toString("base64url")
+  }
+})
+```
+
+### Email Templates
+
+Located in `/src/lib/email/templates/`:
+
+- `booking-confirmation.ts` - Sent when project status → BOOKED
+- `gallery-ready.ts` - Sent manually when gallery is shared
 
 ---
 
 ## UI Component Standards
 
-### ⚠️ CRITICAL REQUIREMENT: shadcn/ui Only
+### shadcn/ui Requirements
 
-**ALL UI components in this application MUST use shadcn/ui components. NO exceptions.**
+ALL UI components MUST use shadcn/ui. No custom HTML elements for standard UI.
 
-**Why this is mandatory:**
-- **Consistency:** Unified design language across the entire app
-- **Accessibility:** WCAG compliant out of the box (Radix UI primitives)
-- **Customization:** Full control over component code (not a library)
-- **Type Safety:** Full TypeScript support
-- **Mobile-First:** Responsive by default
-- **Performance:** No runtime overhead, tree-shakeable
-
-**What this means:**
-- ✅ Use `<Button>` from `@/components/ui/button`
-- ✅ Use `<Input>` from `@/components/ui/input`
-- ✅ Use `<Card>` from `@/components/ui/card`
-- ❌ DO NOT create custom `<button>` elements
-- ❌ DO NOT use plain HTML inputs
-- ❌ DO NOT write custom component CSS
-
-**Available Components:**
-Installed components are in `src/components/ui/`:
-- `button.tsx` - Buttons with variants
-- `card.tsx` - Cards with header, content, footer
-- `input.tsx` - Text inputs
-- `label.tsx` - Form labels
-- `form.tsx` - Form wrapper with validation
-- `table.tsx` - Data tables
-- `dialog.tsx` - Modals and dialogs
-- `dropdown-menu.tsx` - Dropdown menus
-- `toast.tsx` - Toast notifications
-- `avatar.tsx` - User avatars
-- `badge.tsx` - Status badges
-- `separator.tsx` - Visual separators
-
-**Installing Additional Components:**
-```bash
-npx shadcn@latest add [component-name]
-```
-
-**Example Usage:**
+**Correct:**
 ```tsx
-// ✅ CORRECT
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 
-function MyComponent() {
-  return (
-    <Card>
-      <Input type="email" placeholder="Email" />
-      <Button>Submit</Button>
-    </Card>
-  )
-}
-
-// ❌ WRONG - Don't do this!
-function MyComponent() {
-  return (
-    <div className="card">
-      <input type="email" placeholder="Email" />
-      <button className="btn">Submit</button>
-    </div>
-  )
-}
+<Card>
+  <CardContent>
+    <Input type="email" />
+    <Button>Submit</Button>
+  </CardContent>
+</Card>
 ```
 
-**When you need a component that's not installed:**
-1. Check if shadcn/ui has it: https://ui.shadcn.com/docs/components
-2. Install it: `npx shadcn@latest add [component-name]`
-3. Use it from `@/components/ui/[component-name]`
-
-**Custom Components:**
-Only create custom components when:
-- Combining multiple shadcn/ui components (e.g., `ClientCard` using `Card`, `Avatar`, `Badge`)
-- Business logic wrappers (e.g., `ClientForm` using `Form`, `Input`, `Button`)
-- Feature-specific components that compose shadcn/ui primitives
-
-**Never create custom versions of standard UI elements (buttons, inputs, cards, etc.)**
-
----
-
-## Design Patterns
-
-### Server Components First
-
-**Default:** Use Server Components for all pages
-- Faster initial load
-- Reduced client bundle size
-- Direct database access
-- SEO friendly
-
-**Client Components:** Only when needed
-- User interaction (forms, buttons)
-- Browser APIs (localStorage, geolocation)
-- State management (useState, useContext)
-- Effects (useEffect)
-
-### Server Actions for Mutations
-
-**Why:** Type-safe, no API route boilerplate
-```typescript
-// actions/clients/create-client.ts
-"use server"
-
-export async function createClient(data: ClientFormData) {
-  const user = await requireAuth()
-  const validated = clientSchema.parse(data)
-  const client = await prisma.client.create({
-    data: { ...validated, userId: user.id }
-  })
-  revalidatePath('/dashboard/clients')
-  return client
-}
-```
-
-**Usage in Client Component:**
-```typescript
-"use client"
-import { createClient } from '@/actions/clients/create-client'
-
-function ClientForm() {
-  const onSubmit = async (data) => {
-    const client = await createClient(data)
-    router.push(`/dashboard/clients/${client.id}`)
-  }
-}
-```
-
-### Progressive Enhancement
-
-**Forms work without JavaScript:**
+**Incorrect:**
 ```tsx
-<form action={createClientAction}>
-  <input name="firstName" required />
-  <button type="submit">Create</button>
-</form>
+<div className="card">
+  <input type="email" />
+  <button>Submit</button>
+</div>
 ```
 
-**Enhanced with JavaScript:**
-- Validation before submission
-- Optimistic updates
-- Loading states
-- Error handling
+### Available Components
 
-### Authentication Flow
-
-1. **User visits protected route** (`/dashboard/clients`)
-2. **Middleware checks session** (`middleware.ts`)
-3. **No session?** Redirect to `/auth/signin`
-4. **Has session?** Continue to page
-5. **Page/Action** verifies auth with `requireAuth()`
-
-### Authorization Pattern
-
-**Every server action/API route:**
-```typescript
-const user = await requireAuth()
-const client = await prisma.client.findUnique({
-  where: { id, userId: user.id } // Security: userId check
-})
-```
-
-**Never trust client input:**
-- Always check userId matches logged-in user
-- Validate all inputs with Zod
-- Sanitize before database operations
+Core components in `/src/components/ui/`:
+- Button, Input, Label, Textarea
+- Card, Dialog, Sheet, Dropdown
+- Table, Badge, Avatar
+- Form (with React Hook Form integration)
+- Toast (via Sonner)
+- Calendar (date picker)
 
 ---
 
-## API Design
-
-### RESTful Routes
-
-**Naming:** Plural resources
-```
-GET    /api/clients       # List clients
-POST   /api/clients       # Create client
-GET    /api/clients/:id   # Get client
-PATCH  /api/clients/:id   # Update client
-DELETE /api/clients/:id   # Delete client
-```
-
-**Response Format:**
-```typescript
-// Success
-{ data: {...}, meta: { page, total } }
-
-// Error
-{ error: { message: "...", code: "..." } }
-```
-
-### Server Actions
-
-**Naming:** Verb-noun format
-```
-createClient, updateClient, deleteClient
-createBooking, syncToCalendar
-uploadPhotos, generateShareLink
-```
-
-**Return Format:**
-```typescript
-// Success
-{ success: true, data: {...} }
-
-// Error (throw)
-throw new Error("Client not found")
-```
-
----
-
-## Security Architecture
+## Security Measures
 
 ### Authentication
-
-**NextAuth.js v5:**
-- JWT strategy (stateless)
-- Secure cookie (httpOnly, secure, sameSite)
-- CSRF protection (built-in)
-
-**Password Hashing:**
-- bcryptjs with salt rounds: 10
-- Never store plaintext passwords
+- JWT tokens with httpOnly cookies
+- CSRF protection (built into NextAuth)
+- OAuth state validation
 
 ### Authorization
-
-**Row-Level Security Pattern:**
-```typescript
-// Every query checks userId
-const clients = await prisma.client.findMany({
-  where: { userId: user.id }
-})
-```
-
-**Middleware Protection:**
-```typescript
-// middleware.ts
-if (pathname.startsWith('/dashboard')) {
-  const token = await getToken({ req })
-  if (!token) return NextResponse.redirect('/auth/signin')
-}
-```
+- All server actions verify user ownership
+- Row-level security pattern: `where: { userId: user.id }`
 
 ### Input Validation
+- Zod schemas for all inputs
+- Validation on client (UX) and server (security)
 
-**Zod Schemas:**
-```typescript
-const clientSchema = z.object({
-  firstName: z.string().min(1),
-  email: z.string().email(),
-  // ...
-})
-```
-
-**Double Validation:**
-1. Client-side (React Hook Form + Zod)
-2. Server-side (Server Action + Zod)
-
-### File Upload Security
-
-**S3 Direct Upload:**
-1. Client requests presigned URL from API
-2. Server generates signed URL (expires in 1 hour)
-3. Client uploads directly to S3
-4. Client notifies server of successful upload
-5. Server validates and creates Photo record
-
-**Validation:**
-- File type (MIME checking)
-- File size limits
-- Virus scanning (future)
-
-### CORS Configuration
-
-**S3 Bucket:**
-- Development: `http://localhost:3000`
-- Production: `https://yourdomain.com`
-
-**API Routes:**
-- Same-origin by default
-- Explicit CORS headers for public endpoints
-
-### Environment Variables
-
-**Never commit:**
-- `.env.local` in `.gitignore`
-- Use Vercel environment variables for production
-
-**Access:**
-- Server: All env vars
-- Client: Only `NEXT_PUBLIC_*` vars
+### File Uploads
+- Presigned URLs expire after 1 hour
+- File type validation
+- Size limits enforced
 
 ---
 
-## Performance Optimization
+## Performance Optimizations
 
-### Rendering Strategy
+### Rendering
+- Server Components by default
+- Client Components only for interactivity
+- Streaming with Suspense for loading states
 
-**Static Generation:** Landing page, docs
-**Server-Side Rendering:** Dashboard pages (dynamic data)
-**Incremental Static Regeneration:** Public galleries (revalidate: 3600)
+### Database
+- Connection pooling via Neon
+- Indexed queries on userId, status
+- Pagination for lists
 
-### Image Optimization
-
-**Sharp Processing:**
-- Resize to max 4000px width
-- Generate thumbnails (400x400)
-- Optimize JPEG quality (80-85%)
-- WebP format for modern browsers
-
-**Next.js Image Component:**
-```tsx
-<Image
-  src={photo.s3Url}
-  alt={photo.filename}
-  width={800}
-  height={600}
-  priority={isAboveFold}
-/>
-```
-
-### Database Query Optimization
-
-**Indexes:** On frequently queried fields
-**Select Only Needed Fields:**
-```typescript
-const clients = await prisma.client.findMany({
-  select: { id: true, firstName: true, lastName: true }
-})
-```
-
-**Pagination:**
-```typescript
-const clients = await prisma.client.findMany({
-  take: 20,
-  skip: page * 20
-})
-```
-
-### Caching Strategy
-
-**React Query:**
-- Cache server data
-- Background refetching
-- Stale-while-revalidate
-
-**Next.js:**
-- Static assets (CDN)
-- API routes (`Cache-Control` headers)
-
----
-
-## Mobile-First Design
-
-### Responsive Breakpoints
-
-```typescript
-// tailwind.config.ts
-theme: {
-  screens: {
-    'sm': '640px',   // Tablet
-    'md': '768px',   // Small desktop
-    'lg': '1024px',  // Desktop
-    'xl': '1280px',  // Large desktop
-  }
-}
-```
-
-### Mobile Navigation
-
-**Bottom Tab Bar** (< 768px)
-- Fixed position at bottom
-- 44px touch targets
-- Icons + labels
-- Accessible (ARIA labels)
-
-**Desktop Sidebar** (>= 768px)
-- Fixed left sidebar
-- Collapsible
-- Nested navigation
-
-### Touch Targets
-
-**Minimum:** 44x44px (Apple HIG, Material Design)
-```css
-.button {
-  @apply min-h-[44px] min-w-[44px]
-}
-```
-
-### Performance Budget
-
-**Mobile:**
-- First Contentful Paint: < 1.5s
-- Time to Interactive: < 3s
-- Total Bundle Size: < 300KB (gzipped)
+### Images
+- Direct S3 URLs (CDN optional)
+- Thumbnail generation for grids
+- Lazy loading in galleries
 
 ---
 
 ## Error Handling
 
-### Client Errors
+### Server Actions
+```typescript
+try {
+  // Action logic
+  return { success: true, data: result }
+} catch (error) {
+  console.error("Action failed:", error)
+  return { error: "Failed to complete action" }
+}
+```
 
-**React Error Boundaries:**
+### Client Components
 ```tsx
-<ErrorBoundary fallback={<ErrorPage />}>
-  <Dashboard />
-</ErrorBoundary>
-```
+const { error, isError } = useQuery(...)
 
-**Toast Notifications:**
-```typescript
-toast.error("Failed to create client")
-toast.success("Client created successfully")
-```
-
-### Server Errors
-
-**Server Actions:**
-```typescript
-try {
-  const client = await createClient(data)
-  return { success: true, client }
-} catch (error) {
-  console.error(error)
-  throw new Error("Failed to create client")
+if (isError) {
+  return <ErrorMessage message={error.message} />
 }
 ```
 
-**API Routes:**
-```typescript
-try {
-  // ...
-} catch (error) {
-  return NextResponse.json(
-    { error: "Internal server error" },
-    { status: 500 }
-  )
-}
-```
-
-### Logging
-
-**Development:** Console logs
-**Production:** Error tracking service (Sentry, LogRocket)
+### Global Error Boundary
+- Next.js error.tsx files for route errors
+- Toast notifications for user feedback
 
 ---
 
-## Testing Strategy (Future)
-
-### Unit Tests
-- Utility functions
-- Validation schemas
-- Pure components
-
-### Integration Tests
-- API routes
-- Server actions
-- Database operations
-
-### End-to-End Tests
-- Critical user flows
-- Authentication
-- Photo upload
-
-**Tools:**
-- Jest for unit tests
-- React Testing Library for components
-- Playwright for E2E
-
----
-
-## Monitoring & Analytics (Future)
-
-### Application Monitoring
-- Vercel Analytics (speed insights)
-- Error tracking (Sentry)
-- User analytics (privacy-friendly)
-
-### Database Monitoring
-- Neon dashboard (query performance)
-- Slow query logs
-
-### Infrastructure
-- Vercel deployment logs
-- AWS S3 metrics
-- Google API quotas
-
----
-
-## Scalability Considerations
-
-### Database
-- Neon auto-scales
-- Connection pooling (PgBouncer)
-- Read replicas (future)
-
-### File Storage
-- S3 scales infinitely
-- CloudFront CDN for global delivery
-
-### Application
-- Vercel edge functions
-- Serverless (auto-scaling)
-- Stateless architecture
-
-### Costs
-- Neon: Free tier → Pro ($19/month)
-- Vercel: Free tier → Pro ($20/month)
-- AWS S3: Pay per GB (estimate: $3-10/month)
-
----
-
-## Future Enhancements
-
-### Phase 2 Features
-- Contracts & e-signing (DocuSign)
-- Payment processing (Stripe)
-- AI photo selection
-- Advanced analytics
-
-### Technical Improvements
-- PWA (offline support)
-- Native mobile apps (React Native)
-- Real-time collaboration
-- Advanced caching strategies
-
----
-
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Last Updated:** January 10, 2026
-**Next Review:** After Phase 1 completion

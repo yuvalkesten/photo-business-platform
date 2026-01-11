@@ -7,43 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==================== AUTH MODELS ====================
-
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?   // For email/password auth
-  role          UserRole  @default(PHOTOGRAPHER)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  accounts      Account[]
-  sessions      Session[]
-  contacts      Contact[]
-  organizations Organization[]
-  projects      Project[]
-  galleries     Gallery[]
-
-  // Settings
-  businessName    String?
-  businessLogo    String?
-  businessEmail   String?
-  businessPhone   String?
-  timezone        String   @default("America/New_York")
+  id                 String              @id @default(cuid())
+  name               String?
+  email              String              @unique
+  emailVerified      DateTime?
+  image              String?
+  password           String?
+  role               UserRole            @default(PHOTOGRAPHER)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  businessName       String?
+  businessLogo       String?
+  businessEmail      String?
+  businessPhone      String?
+  timezone           String              @default("America/New_York")
+  accounts           Account[]
+  contacts           Contact[]
+  emailWatch         EmailWatch?
+  financialDocuments FinancialDocument[]
+  galleries          Gallery[]
+  instagramAccount   InstagramAccount?
+  organizations      Organization[]
+  processedEmails    ProcessedEmail[]
+  processedMessages  ProcessedMessage[]
+  projects           Project[]
+  sessions           Session[]
 
   @@map("users")
-}
-
-enum UserRole {
-  PHOTOGRAPHER
-  ADMIN
-  CLIENT
 }
 
 model Account {
@@ -52,15 +43,14 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?  @db.Text
-  access_token      String?  @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?  @db.Text
+  id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
@@ -85,47 +75,33 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// ==================== CRM MODELS ====================
-
 model Contact {
-  id        String   @id @default(cuid())
-  userId    String   // Photographer who owns this contact
-
-  // Basic Info
-  firstName String
-  lastName  String
-  email     String
-  phone     String?
-
-  // Organization
-  organizationId String?     // Optional link to Organization
-  jobTitle       String?     // Their role (e.g., "Event Coordinator")
-
-  // Additional Info
-  address   String?
-  city      String?
-  state     String?
-  zipCode   String?
-  website   String?
-
-  // Categorization
-  type      ContactType   @default(LEAD)
-  source    String?       // How they found you (referral, Instagram, etc.)
-  tags      String[]      // Flexible tagging
-
-  // Status & Notes
-  status    ContactStatus @default(ACTIVE)
-  notes     String?       @db.Text
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization? @relation(fields: [organizationId], references: [id])
-  projects     Project[]
-  galleries    Gallery[]
+  id              String           @id @default(cuid())
+  userId          String
+  firstName       String
+  lastName        String
+  email           String
+  phone           String?
+  organizationId  String?
+  jobTitle        String?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  website         String?
+  type            ContactType      @default(LEAD)
+  source          String?
+  tags            String[]
+  status          ContactStatus    @default(ACTIVE)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  organization    Organization?    @relation(fields: [organizationId], references: [id])
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  galleries         Gallery[]
+  processedEmails   ProcessedEmail[]
+  processedMessages ProcessedMessage[]
+  projects          Project[]
 
   @@unique([userId, email])
   @@index([userId, type])
@@ -134,54 +110,240 @@ model Contact {
   @@map("contacts")
 }
 
-enum ContactType {
-  LEAD              // Potential client (inquired but not booked)
-  CLIENT            // Active client (has ongoing projects)
-  PAST_CLIENT       // Former client (all projects completed)
-  COLLABORATOR      // Other photographer, assistant, second shooter
-  SUPPLIER          // Venue, vendor, printer, etc.
-  REFERRAL_SOURCE   // Someone who sends clients your way
-}
-
-enum ContactStatus {
-  ACTIVE      // Currently engaged
-  INACTIVE    // Haven't heard from in a while
-  ARCHIVED    // No longer relevant
-}
-
 model Organization {
-  id        String   @id @default(cuid())
-  userId    String   // Photographer who owns this org
-
-  // Basic Info
+  id        String    @id @default(cuid())
+  userId    String
   name      String
-  type      OrgType?         // Company, NGO, Venue, etc.
+  type      OrgType?
   website   String?
   email     String?
   phone     String?
-
-  // Address
   address   String?
   city      String?
   state     String?
   zipCode   String?
-
-  // Additional
-  notes     String?  @db.Text
+  notes     String?
   tags      String[]
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  contacts  Contact[]
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contacts  Contact[] // People who work at this org
-  projects  Project[] // Projects directly with this org
+  projects  Project[]
 
   @@unique([userId, name])
   @@index([userId])
   @@map("organizations")
+}
+
+model Project {
+  id                String           @id @default(cuid())
+  userId            String
+  contactId         String
+  organizationId    String?
+  name              String
+  description       String?
+  projectType       ProjectType
+  status            ProjectStatus    @default(INQUIRY)
+  totalPrice        Decimal?         @db.Decimal(10, 2)
+  deposit           Decimal?         @db.Decimal(10, 2)
+  paidAmount        Decimal?         @db.Decimal(10, 2)
+  source            String?
+  notes             String?
+  tags              String[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  completedAt       DateTime?
+  bookedAt          DateTime?
+  budgetMax         Decimal?         @db.Decimal(10, 2)
+  budgetMin         Decimal?         @db.Decimal(10, 2)
+  closeProbability  Int?             @default(50)
+  eventDate         DateTime?
+  expectedCloseDate DateTime?
+  lastContactDate   DateTime?
+  leadTemperature   LeadTemperature?
+  lostNotes         String?
+  lostReason        LostReason?
+  nextFollowUpDate  DateTime?
+  galleries         Gallery[]
+  sessions          PhotoSession[]
+  processedEmails   ProcessedEmail[]
+  processedMessages ProcessedMessage[]
+  contact           Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  organization      Organization?    @relation(fields: [organizationId], references: [id])
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([contactId])
+  @@index([organizationId])
+  @@index([userId, leadTemperature])
+  @@index([userId, nextFollowUpDate])
+  @@index([userId, eventDate])
+  @@map("projects")
+}
+
+model PhotoSession {
+  id               String             @id @default(cuid())
+  projectId        String
+  title            String
+  description      String?
+  scheduledAt      DateTime
+  startTime        DateTime
+  endTime          DateTime
+  timezone         String             @default("America/New_York")
+  location         String?
+  locationNotes    String?
+  googleEventId    String?            @unique
+  googleCalendarId String?
+  status           PhotoSessionStatus @default(SCHEDULED)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  project          Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([scheduledAt])
+  @@map("photo_sessions")
+}
+
+model Gallery {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String
+  description   String?
+  coverImage    String?
+  isPublic      Boolean   @default(false)
+  password      String?
+  shareToken    String    @unique @default(cuid())
+  expiresAt     DateTime?
+  allowDownload Boolean   @default(true)
+  watermark     Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  contactId     String
+  projectId     String
+  contact       Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photos        Photo[]
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([contactId])
+  @@index([shareToken])
+  @@map("galleries")
+}
+
+model Photo {
+  id           String   @id @default(cuid())
+  galleryId    String
+  filename     String
+  s3Key        String   @unique
+  s3Url        String
+  thumbnailUrl String?
+  fileSize     Int
+  width        Int
+  height       Int
+  mimeType     String
+  order        Int      @default(0)
+  isFavorite   Boolean  @default(false)
+  tags         String[]
+  uploadedAt   DateTime @default(now())
+  gallery      Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@index([galleryId, order])
+  @@map("photos")
+}
+
+model EmailWatch {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  historyId   String
+  expiration  DateTime
+  resourceUri String?
+  isActive    Boolean  @default(true)
+  lastSyncAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_watches")
+}
+
+model ProcessedEmail {
+  id                 String               @id @default(cuid())
+  userId             String
+  gmailMessageId     String
+  gmailThreadId      String?
+  subject            String
+  fromEmail          String
+  fromName           String?
+  receivedAt         DateTime
+  snippet            String?
+  classification     EmailClassification?
+  classificationData String?
+  classifiedAt       DateTime?
+  status             ProcessingStatus     @default(PENDING)
+  errorMessage       String?
+  retryCount         Int                  @default(0)
+  createdContactId   String?
+  createdProjectId   String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  financialDocument  FinancialDocument?
+  createdContact     Contact?             @relation(fields: [createdContactId], references: [id])
+  createdProject     Project?             @relation(fields: [createdProjectId], references: [id])
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gmailMessageId])
+  @@index([userId, status])
+  @@index([userId, classification])
+  @@index([userId, receivedAt])
+  @@map("processed_emails")
+}
+
+model FinancialDocument {
+  id               String          @id @default(cuid())
+  userId           String
+  processedEmailId String?         @unique
+  documentType     DocumentType
+  amount           Decimal?        @db.Decimal(10, 2)
+  currency         String          @default("USD")
+  vendorName       String?
+  vendorEmail      String?
+  documentNumber   String?
+  documentDate     DateTime?
+  dueDate          DateTime?
+  status           DocumentStatus  @default(PENDING_REVIEW)
+  reviewedAt       DateTime?
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  processedEmail   ProcessedEmail? @relation(fields: [processedEmailId], references: [id])
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, documentType])
+  @@index([userId, status])
+  @@map("financial_documents")
+}
+
+enum UserRole {
+  PHOTOGRAPHER
+  ADMIN
+  CLIENT
+}
+
+enum ContactType {
+  LEAD
+  CLIENT
+  PAST_CLIENT
+  COLLABORATOR
+  SUPPLIER
+  REFERRAL_SOURCE
+}
+
+enum ContactStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
 }
 
 enum OrgType {
@@ -191,66 +353,6 @@ enum OrgType {
   VENDOR
   AGENCY
   OTHER
-}
-
-// ==================== PROJECT MODELS ====================
-
-model Project {
-  id             String   @id @default(cuid())
-  userId         String   // Photographer
-  contactId      String   // Primary contact
-  organizationId String?  // Optional organization (for corporate projects)
-
-  // Project Details
-  name          String    // e.g., "Sarah & Mike's Wedding"
-  description   String?   @db.Text
-  projectType   ProjectType
-
-  // Workflow Stage
-  status        ProjectStatus @default(INQUIRY)
-
-  // Financial
-  totalPrice    Decimal?  @db.Decimal(10, 2)
-  deposit       Decimal?  @db.Decimal(10, 2)
-  paidAmount    Decimal?  @db.Decimal(10, 2)
-
-  // Additional Info
-  source        String?   // How they found you
-  notes         String?   @db.Text
-  tags          String[]
-
-  // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  completedAt   DateTime?
-
-  // CRM Lead Fields (primarily for INQUIRY/PROPOSAL_SENT stages)
-  budgetMin         Decimal?         @db.Decimal(10, 2)
-  budgetMax         Decimal?         @db.Decimal(10, 2)
-  leadTemperature   LeadTemperature?
-  nextFollowUpDate  DateTime?
-  lastContactDate   DateTime?
-  expectedCloseDate DateTime?
-  closeProbability  Int?             @default(50) // 0-100% likelihood
-  eventDate         DateTime?        // When is the event (needed at lead stage)
-  lostReason        LostReason?
-  lostNotes         String?          @db.Text
-  bookedAt          DateTime?        // When status changed to BOOKED
-
-  // Relations
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contact       Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  organization  Organization? @relation(fields: [organizationId], references: [id])
-  sessions      PhotoSession[]
-  galleries     Gallery[]
-
-  @@index([userId, status])
-  @@index([contactId])
-  @@index([organizationId])
-  @@index([userId, leadTemperature])
-  @@index([userId, nextFollowUpDate])
-  @@index([userId, eventDate])
-  @@map("projects")
 }
 
 enum ProjectType {
@@ -267,68 +369,31 @@ enum ProjectType {
 }
 
 enum ProjectStatus {
-  INQUIRY         // Initial contact, not booked yet
-  PROPOSAL_SENT   // Quote/proposal sent
-  BOOKED          // Contract signed, deposit paid
-  IN_PROGRESS     // Actively working (shoots happening)
-  POST_PRODUCTION // Editing photos
-  DELIVERED       // Photos delivered to client
-  COMPLETED       // Everything done, paid in full
-  CANCELLED       // Project cancelled
-  ARCHIVED        // Old project, no longer relevant
+  INQUIRY
+  PROPOSAL_SENT
+  BOOKED
+  IN_PROGRESS
+  POST_PRODUCTION
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  ARCHIVED
 }
 
 enum LeadTemperature {
-  HOT       // High likelihood, responding quickly
-  WARM      // Interested, moderate engagement
-  COLD      // Low engagement, needs nurturing
+  HOT
+  WARM
+  COLD
 }
 
 enum LostReason {
-  BUDGET              // Price too high
-  TIMING              // Date not available
-  COMPETITOR          // Chose another photographer
-  NO_RESPONSE         // Client went silent
-  SCOPE_MISMATCH      // Requirements didn't fit
-  PERSONAL_REASONS    // Client circumstances
-  OTHER               // See notes
-}
-
-model PhotoSession {
-  id        String   @id @default(cuid())
-  projectId String
-
-  // Session Details
-  title         String    // e.g., "Engagement Shoot" or "Wedding Day"
-  description   String?   @db.Text
-
-  // Date & Time
-  scheduledAt   DateTime
-  startTime     DateTime
-  endTime       DateTime
-  timezone      String    @default("America/New_York")
-
-  // Location
-  location      String?
-  locationNotes String?   @db.Text
-
-  // Google Calendar Integration
-  googleEventId    String? @unique
-  googleCalendarId String?
-
-  // Status
-  status        PhotoSessionStatus @default(SCHEDULED)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([scheduledAt])
-  @@map("photo_sessions")
+  BUDGET
+  TIMING
+  COMPETITOR
+  NO_RESPONSE
+  SCOPE_MISMATCH
+  PERSONAL_REASONS
+  OTHER
 }
 
 enum PhotoSessionStatus {
@@ -338,73 +403,85 @@ enum PhotoSessionStatus {
   CANCELLED
 }
 
-// ==================== GALLERY MODELS ====================
-
-model Gallery {
-  id        String   @id @default(cuid())
-  userId    String   // Photographer
-  projectId String   // Which project
-  contactId String   // Primary contact (for access)
-
-  // Details
-  title       String
-  description String?  @db.Text
-  coverImage  String?  // URL to cover image
-
-  // Access Control
-  isPublic    Boolean  @default(false)
-  password    String?  // Hashed password for protected galleries
-  shareToken  String   @unique @default(cuid()) // Unique token for sharing
-  expiresAt   DateTime? // Optional expiration
-
-  // Settings
-  allowDownload Boolean @default(true)
-  watermark     Boolean @default(false)
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  contact   Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  photos    Photo[]
-
-  @@index([userId])
-  @@index([projectId])
-  @@index([contactId])
-  @@index([shareToken])
-  @@map("galleries")
+enum EmailClassification {
+  INQUIRY
+  URGENT_REQUEST
+  INVOICE
+  RECEIPT
+  OTHER
 }
 
-model Photo {
-  id        String   @id @default(cuid())
-  galleryId String
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  CLASSIFIED
+  ACTION_TAKEN
+  SKIPPED
+  FAILED
+}
 
-  // File Info
-  filename    String
-  s3Key       String   @unique  // Full S3 key
-  s3Url       String            // CloudFront URL
-  thumbnailUrl String?          // Thumbnail URL
+enum DocumentType {
+  INVOICE
+  RECEIPT
+}
 
-  // Metadata
-  fileSize    Int               // in bytes
-  width       Int
-  height      Int
-  mimeType    String
+enum DocumentStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
 
-  // Organization
-  order       Int      @default(0)
-  isFavorite  Boolean  @default(false)
-  tags        String[]
+enum MessagePlatform {
+  INSTAGRAM
+  // Future: FACEBOOK, WHATSAPP
+}
 
-  // Timestamps
-  uploadedAt DateTime @default(now())
+model InstagramAccount {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  instagramUserId String    @unique
+  username        String?
+  accessToken     String    @db.Text
+  tokenExpiresAt  DateTime?
+  pageId          String?
+  pageName        String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  gallery    Gallery  @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  @@map("instagram_accounts")
+}
 
-  @@index([galleryId, order])
-  @@map("photos")
+model ProcessedMessage {
+  id                 String              @id @default(cuid())
+  userId             String
+  platform           MessagePlatform     @default(INSTAGRAM)
+  platformMessageId  String
+  platformThreadId   String?
+  senderName         String?
+  senderHandle       String?
+  senderId           String
+  messageText        String              @db.Text
+  receivedAt         DateTime
+  classification     EmailClassification?
+  classificationData String?             @db.Text
+  classifiedAt       DateTime?
+  status             ProcessingStatus    @default(PENDING)
+  errorMessage       String?             @db.Text
+  retryCount         Int                 @default(0)
+  createdContactId   String?
+  createdProjectId   String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdContact     Contact?            @relation(fields: [createdContactId], references: [id])
+  createdProject     Project?            @relation(fields: [createdProjectId], references: [id])
+
+  @@unique([userId, platform, platformMessageId])
+  @@index([userId, status])
+  @@index([userId, classification])
+  @@index([userId, receivedAt])
+  @@map("processed_messages")
 }
