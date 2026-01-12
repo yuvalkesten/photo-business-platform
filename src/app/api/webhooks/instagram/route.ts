@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { InstagramWebhookPayload } from "@/lib/instagram/types";
+import { processInstagramMessage } from "@/lib/instagram/processing";
 
 // Environment variables
 const INSTAGRAM_WEBHOOK_VERIFY_TOKEN = process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN;
@@ -126,26 +127,28 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Log the message for now (processing pipeline to be implemented)
+        // Log the incoming message
         console.log(
-          `Processing Instagram DM for user ${instagramAccount.userId}:`,
+          `Received Instagram DM for user ${instagramAccount.userId}:`,
           {
             messageId: event.message.mid,
             senderId: event.sender.id,
-            text: event.message.text.substring(0, 50) + "...",
+            textPreview: event.message.text.substring(0, 50) + (event.message.text.length > 50 ? "..." : ""),
           }
         );
 
-        // TODO: Implement async message processing
-        // processInstagramMessage(instagramAccount.userId, {
-        //   messageId: event.message.mid,
-        //   senderId: event.sender.id,
-        //   text: event.message.text,
-        //   timestamp: new Date(event.timestamp),
-        //   recipientId: event.recipient.id,
-        // }).catch((error) => {
-        //   console.error(`Error processing Instagram message:`, error);
-        // });
+        // Process the message asynchronously (don't await to respond quickly)
+        processInstagramMessage(instagramAccount.userId, {
+          messageId: event.message.mid,
+          senderId: event.sender.id,
+          text: event.message.text,
+          timestamp: new Date(event.timestamp),
+          recipientId: event.recipient.id,
+          hasAttachments: !!(event.message.attachments && event.message.attachments.length > 0),
+          attachmentUrls: event.message.attachments?.map(a => a.payload.url).filter((url): url is string => !!url),
+        }).catch((error) => {
+          console.error(`Error processing Instagram message ${event.message?.mid}:`, error);
+        });
       }
     }
 
