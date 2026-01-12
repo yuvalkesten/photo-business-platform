@@ -67,3 +67,280 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ========================================
+   CINEMATIC EDITORIAL DESIGN SYSTEM
+   For photographers who demand excellence
+   ======================================== */
+
+/* Film grain overlay - subtle texture photographers love */
+.grain-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* Cinematic animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Animation utility classes */
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+/* Staggered animation delays */
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+.delay-500 { animation-delay: 500ms; }
+.delay-600 { animation-delay: 600ms; }
+.delay-700 { animation-delay: 700ms; }
+.delay-800 { animation-delay: 800ms; }
+
+/* Editorial typography */
+.font-editorial {
+  font-family: var(--font-playfair), 'Playfair Display', Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.font-editorial-italic {
+  font-family: var(--font-playfair), 'Playfair Display', Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Warm amber accent - golden hour inspired */
+.text-amber-warm {
+  color: #d4a574;
+}
+
+.bg-amber-warm {
+  background-color: #d4a574;
+}
+
+.border-amber-warm {
+  border-color: #d4a574;
+}
+
+/* Cinematic dark backgrounds */
+.bg-cinematic {
+  background: linear-gradient(180deg, #0a0a0a 0%, #111111 50%, #0d0d0d 100%);
+}
+
+.bg-cinematic-card {
+  background: linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Elegant button styles */
+.btn-editorial {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 2.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #0a0a0a;
+  background: #d4a574;
+  border: none;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-editorial::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.6s ease;
+}
+
+.btn-editorial:hover::before {
+  left: 100%;
+}
+
+.btn-editorial:hover {
+  background: #e0b88a;
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px -15px rgba(212, 165, 116, 0.4);
+}
+
+.btn-outline-editorial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 2.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #d4a574;
+  background: transparent;
+  border: 1px solid #d4a574;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-outline-editorial:hover {
+  background: #d4a574;
+  color: #0a0a0a;
+}
+
+/* Decorative elements */
+.line-accent {
+  width: 60px;
+  height: 1px;
+  background: linear-gradient(90deg, #d4a574 0%, transparent 100%);
+}
+
+.line-accent-center {
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #d4a574 50%, transparent 100%);
+  margin: 0 auto;
+}
+
+/* Asymmetric grid for gallery feel */
+.gallery-grid {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: repeat(12, 1fr);
+}
+
+/* Hover effects */
+.hover-lift {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
+}
+
+/* Text gradient */
+.text-gradient-amber {
+  background: linear-gradient(135deg, #d4a574 0%, #f0d4b8 50%, #d4a574 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Scroll indicator */
+.scroll-indicator {
+  animation: float 2s ease-in-out infinite;
+}
+
+/* Selection color */
+::selection {
+  background: rgba(212, 165, 116, 0.3);
+  color: inherit;
+}
+
+/* Custom scrollbar for dark theme */
+.landing-page::-webkit-scrollbar {
+  width: 8px;
+}
+
+.landing-page::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+.landing-page::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+.landing-page::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
