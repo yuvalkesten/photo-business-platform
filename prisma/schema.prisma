@@ -82,6 +82,7 @@ model Contact {
   lastName        String
   email           String
   phone           String?
+  instagramHandle String?
   organizationId  String?
   jobTitle        String?
   address         String?
@@ -106,6 +107,7 @@ model Contact {
   @@unique([userId, email])
   @@index([userId, type])
   @@index([userId, status])
+  @@index([userId, instagramHandle])
   @@index([organizationId])
   @@map("contacts")
 }
