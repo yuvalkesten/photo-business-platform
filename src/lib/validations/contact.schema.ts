@@ -7,6 +7,11 @@ export const contactSchema = z.object({
   lastName: z.string().min(1, "Last name is required").max(100),
   email: z.string().email("Invalid email address"),
   phone: z.string().optional(),
+  instagramHandle: z
+    .string()
+    .max(30, "Instagram handle must be 30 characters or less")
+    .optional()
+    .transform((val) => (val?.startsWith("@") ? val.slice(1) : val)),
 
   // Organization
   organizationId: z.string().optional(),

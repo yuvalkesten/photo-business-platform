@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
+import { Instagram } from "lucide-react"
 
 interface ContactFormProps {
   contact?: Contact & { organization?: Organization | null }
@@ -54,6 +55,7 @@ export function ContactForm({ contact, organizations = [] }: ContactFormProps) {
       lastName: contact?.lastName || "",
       email: contact?.email || "",
       phone: contact?.phone || "",
+      instagramHandle: contact?.instagramHandle || "",
       organizationId: contact?.organizationId || undefined,
       jobTitle: contact?.jobTitle || "",
       address: contact?.address || "",
@@ -149,6 +151,21 @@ export function ContactForm({ contact, organizations = [] }: ContactFormProps) {
               {...form.register("phone")}
               placeholder="+1 (555) 123-4567"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="instagramHandle">Instagram</Label>
+            <div className="flex">
+              <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
+                <Instagram className="h-4 w-4" />
+              </span>
+              <Input
+                id="instagramHandle"
+                {...form.register("instagramHandle")}
+                placeholder="username"
+                className="rounded-l-none"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

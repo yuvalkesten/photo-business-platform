@@ -30,12 +30,14 @@ import {
   Target,
   Calendar,
   Mail,
+  MessageCircle,
 } from "lucide-react"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Calendar", href: "/dashboard/calendar", icon: Calendar },
   { name: "Emails", href: "/dashboard/emails", icon: Mail },
+  { name: "Messages", href: "/dashboard/messages", icon: MessageCircle },
   { name: "Contacts", href: "/dashboard/contacts", icon: Users },
   { name: "Organizations", href: "/dashboard/organizations", icon: Building2 },
   { name: "Leads", href: "/dashboard/leads", icon: Target },

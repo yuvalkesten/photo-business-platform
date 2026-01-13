@@ -63,12 +63,15 @@ async function handleInquiry(
   // Create contact if new
   if (!contact) {
     const nameParts = parseName(sender.name);
+    // Generate a placeholder email for Instagram contacts (required field)
+    const placeholderEmail = `instagram+${sender.username || sender.instagramId}@placeholder.local`;
 
     contact = await prisma.contact.create({
       data: {
         userId,
         firstName: nameParts.firstName,
         lastName: nameParts.lastName,
+        email: placeholderEmail,
         instagramHandle: sender.username,
         type: ContactType.LEAD,
         source: "INSTAGRAM_DM",

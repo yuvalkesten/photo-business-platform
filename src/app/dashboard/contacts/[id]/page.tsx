@@ -21,6 +21,8 @@ import {
   ImageIcon,
   Calendar,
   ExternalLink,
+  Instagram,
+  MessageCircle,
 } from "lucide-react"
 
 interface ContactDetailPageProps {
@@ -148,6 +150,20 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
                   </a>
                 </div>
               )}
+              {contact.instagramHandle && (
+                <div className="flex items-center gap-3">
+                  <Instagram className="h-4 w-4 text-muted-foreground" />
+                  <a
+                    href={`https://instagram.com/${contact.instagramHandle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm hover:underline flex items-center gap-1"
+                  >
+                    @{contact.instagramHandle}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
               {contact.website && (
                 <div className="flex items-center gap-3">
                   <Globe className="h-4 w-4 text-muted-foreground" />
@@ -232,6 +248,28 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
               )}
             </CardContent>
           </Card>
+
+          {/* Instagram Messages */}
+          {contact.instagramHandle && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5" />
+                  Instagram Messages
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Link
+                  href={`/dashboard/messages?handle=${contact.instagramHandle}`}
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <Instagram className="h-4 w-4" />
+                  View messages from @{contact.instagramHandle}
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Projects & Galleries */}
