@@ -3,24 +3,43 @@
 ## Status: COMPLETED
 
 ## Task Description
-Setting up session resilience workflow to handle EC2 session terminations.
+Instagram DM integration - Messages dashboard and TypeScript fixes
 
 ## Current Focus
 None - task completed
 
 ## Completed Steps
-- [x] Created CURRENT_TASK.md file
-- [x] Updated CLAUDE.md with session resilience instructions
+- [x] Fixed TypeScript errors in Instagram integration
+  - Fixed EmailClassification type in get-instagram-messages.ts
+  - Fixed projectType vs type in ProjectSelect
+  - Fixed username null handling in InstagramSettingsCard
+  - Added placeholder email for Instagram-sourced contacts
+- [x] Built and verified all changes pass TypeScript and build
 - [x] Committed and pushed to main
 
-## Next Steps
-None - awaiting next user request
+## Instagram Integration Status
+The following Instagram features are implemented:
+- OAuth flow for connecting Instagram Business accounts
+- DM message processing pipeline with AI classification
+- Messages dashboard at /dashboard/messages with:
+  - Connection status card
+  - Stats cards (total, inquiries, urgent, pending, failed)
+  - Message list with filtering and pagination
+  - Retry button for failed messages
+- Instagram handle field on contacts
+- Auto-creation of contacts/projects from DM inquiries
 
-## Context
-This file tracks the current work state for Claude Code sessions. When starting a new session:
-1. Pull latest from main
-2. Read this file to understand ongoing work
-3. Continue from where the last session left off
+## Next Steps
+Potential future work:
+- Webhook integration for real-time DM notifications
+- Reply functionality from dashboard
+- Conversation threading view
+- Instagram profile photo display
+
+## Server Configuration
+- Swap file: 2GB at /swapfile (persistent)
+- NODE_OPTIONS: --max-old-space-size=2560 (2.5GB)
+- Build command: NODE_OPTIONS="--max-old-space-size=2560" npm run build
 
 ## Last Updated
 2026-01-13
