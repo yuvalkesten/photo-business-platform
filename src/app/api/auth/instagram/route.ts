@@ -10,7 +10,6 @@
  * - instagram_manage_messages: Read and send Instagram DMs
  * - pages_show_list: List Facebook Pages the user manages
  * - pages_read_engagement: Read Page info
- * - pages_messaging: Send messages via Page
  */
 
 import { NextResponse } from "next/server";
@@ -20,13 +19,12 @@ import crypto from "crypto";
 const META_APP_ID = process.env.META_APP_ID;
 const NEXTAUTH_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
-// Facebook Login scopes for Instagram messaging via Pages
+// Scopes for Facebook Login - request these directly instead of via config_id
 const FACEBOOK_SCOPES = [
   "instagram_basic",
   "instagram_manage_messages",
   "pages_show_list",
   "pages_read_engagement",
-  "pages_messaging",
 ].join(",");
 
 /**
@@ -60,7 +58,7 @@ export async function GET() {
   };
   const state = Buffer.from(JSON.stringify(stateData)).toString("base64url");
 
-  // Build the Facebook OAuth URL
+  // Build the Facebook OAuth URL with scopes directly
   const redirectUri = `${NEXTAUTH_URL}/api/auth/instagram/callback`;
 
   const authUrl = new URL("https://www.facebook.com/v18.0/dialog/oauth");

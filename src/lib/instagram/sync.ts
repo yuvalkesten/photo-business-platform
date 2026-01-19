@@ -84,7 +84,7 @@ export async function syncHistoricalMessages(
     let conversationCursor: string | undefined;
     let conversationsProcessed = 0;
 
-    // Try to fetch conversations - this may fail with Instagram Login tokens
+    // Try to fetch conversations - this may fail without Advanced Access
     let initialResponse;
     try {
       initialResponse = await fetchInstagramConversations(
@@ -93,11 +93,14 @@ export async function syncHistoricalMessages(
         { after: conversationCursor, limit: 20 }
       );
     } catch (error) {
-      // Check if this is a permission error (Instagram Login doesn't support /conversations)
-      if (error instanceof Error && error.message.includes("unknown error")) {
+      // Check if this is a permission/capability error
+      if (error instanceof Error &&
+          (error.message.includes("unknown error") ||
+           error.message.includes("does not have the capability") ||
+           error.message.includes("Application does not have"))) {
         console.log(
           `[Instagram Sync] Historical sync not available for user ${userId}. ` +
-          `This typically means the account is using Instagram Login instead of Facebook Login. ` +
+          `This requires Advanced Access for instagram_manage_messages permission. ` +
           `Real-time messages via webhooks will still work.`
         );
         return {

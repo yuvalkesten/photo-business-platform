@@ -152,12 +152,21 @@ export async function GET(request: NextRequest) {
     const userAccessToken = longLivedData.access_token;
     const expiresIn = longLivedData.expires_in;
 
+    // Debug: Log token info (first 20 chars only for security)
+    console.log("Long-lived token obtained:", {
+      tokenPrefix: userAccessToken.substring(0, 20) + "...",
+      expiresIn,
+    });
+
     // Step 3: Get the user's Facebook Pages
     const pagesUrl = new URL(`${GRAPH_API_BASE}/me/accounts`);
     pagesUrl.searchParams.set("access_token", userAccessToken);
     pagesUrl.searchParams.set("fields", "id,name,access_token,instagram_business_account");
 
+    console.log("Fetching pages from:", pagesUrl.toString().replace(userAccessToken, "[REDACTED]"));
+
     const pagesResponse = await fetch(pagesUrl.toString());
+    console.log("Pages response status:", pagesResponse.status);
     if (!pagesResponse.ok) {
       const errorData = await pagesResponse.json();
       console.error("Failed to fetch Facebook Pages:", errorData);
@@ -166,13 +175,69 @@ export async function GET(request: NextRequest) {
 
     const pagesData: PagesResponse = await pagesResponse.json();
 
+    // Debug: Log all pages returned
+    console.log("Facebook Pages returned:", JSON.stringify(pagesData, null, 2));
+
     // Step 4: Find a page with an Instagram Business Account
-    const pageWithInstagram = pagesData.data.find(
+    let pageWithInstagram = pagesData.data.find(
       (page) => page.instagram_business_account?.id
     );
 
+    // If no pages returned, try getting Page directly using token debug info
+    if (pagesData.data.length === 0) {
+      console.log("No pages from /me/accounts, trying to extract from token granular_scopes...");
+
+      // Get token debug info to find the Page ID and Instagram ID from granular_scopes
+      const debugUrl = new URL(`${GRAPH_API_BASE}/debug_token`);
+      debugUrl.searchParams.set("input_token", userAccessToken);
+      debugUrl.searchParams.set("access_token", `${META_APP_ID}|${META_APP_SECRET}`);
+
+      const debugResponse = await fetch(debugUrl.toString());
+      if (debugResponse.ok) {
+        const debugData = await debugResponse.json();
+        console.log("Token debug info:", JSON.stringify(debugData, null, 2));
+
+        // Extract Page ID and Instagram ID from granular_scopes
+        const granularScopes = debugData.data?.granular_scopes || [];
+        const pagesScope = granularScopes.find((s: { scope: string }) => s.scope === "pages_show_list");
+        const instagramScope = granularScopes.find((s: { scope: string }) => s.scope === "instagram_basic");
+
+        const pageId = pagesScope?.target_ids?.[0];
+        const instagramId = instagramScope?.target_ids?.[0];
+
+        if (pageId && instagramId) {
+          console.log(`Found Page ID: ${pageId}, Instagram ID: ${instagramId} from granular_scopes`);
+
+          // Fetch the Page directly to get its access token
+          const directPageUrl = new URL(`${GRAPH_API_BASE}/${pageId}`);
+          directPageUrl.searchParams.set("access_token", userAccessToken);
+          directPageUrl.searchParams.set("fields", "id,name,access_token,instagram_business_account{id,username}");
+
+          const directPageResponse = await fetch(directPageUrl.toString());
+          if (directPageResponse.ok) {
+            const directPageData = await directPageResponse.json();
+            console.log("Direct page fetch result:", JSON.stringify(directPageData, null, 2));
+
+            if (directPageData.instagram_business_account?.id) {
+              pageWithInstagram = {
+                id: directPageData.id,
+                name: directPageData.name,
+                access_token: directPageData.access_token,
+                instagram_business_account: directPageData.instagram_business_account,
+              };
+            }
+          } else {
+            const errorData = await directPageResponse.json();
+            console.error("Failed to fetch page directly:", errorData);
+          }
+        }
+      }
+    }
+
     if (!pageWithInstagram || !pageWithInstagram.instagram_business_account) {
-      console.log("No Instagram Business Account found on any page");
+      console.log("No Instagram Business Account found on any page. Pages received:",
+        pagesData.data.map(p => ({ id: p.id, name: p.name, hasInstagram: !!p.instagram_business_account }))
+      );
       return redirectWithError(
         "No Instagram Business account found. Please ensure your Instagram is linked to a Facebook Page."
       );
