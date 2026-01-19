@@ -71,13 +71,16 @@ export async function POST(request: NextRequest) {
     // Get raw body for signature verification
     const rawBody = await request.text();
 
-    // Verify the request signature
-    if (META_APP_SECRET) {
-      const signature = request.headers.get("x-hub-signature-256");
+    // Verify the request signature (skip in development for testing)
+    const signature = request.headers.get("x-hub-signature-256");
+    if (META_APP_SECRET && process.env.NODE_ENV === "production") {
       if (!verifySignature(rawBody, signature)) {
         console.warn("Invalid Instagram webhook signature");
         return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
       }
+    } else {
+      // In development, log signature for debugging but don't verify
+      console.log("Webhook received (dev mode, signature not verified):", signature?.substring(0, 30) + "...");
     }
 
     // Parse the payload

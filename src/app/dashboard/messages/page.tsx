@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/auth/utils";
 import { InstagramSettingsCard } from "@/components/features/instagram/InstagramSettingsCard";
 import { InstagramStatsCards } from "@/components/features/instagram/InstagramStatsCards";
-import { InstagramMessageList } from "@/components/features/instagram/InstagramMessageList";
+import { InstagramMessagesClient } from "@/components/features/instagram/InstagramMessagesClient";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -52,14 +52,12 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
         <InstagramStatsCards />
       </Suspense>
 
-      {/* Message List */}
-      <Suspense fallback={<MessageListSkeleton />}>
-        <InstagramMessageList
-          classification={classification}
-          status={status}
-          page={page}
-        />
-      </Suspense>
+      {/* Message List - Client component with auto-refresh */}
+      <InstagramMessagesClient
+        classification={classification}
+        status={status}
+        page={page}
+      />
     </div>
   );
 }
@@ -95,25 +93,3 @@ function StatsCardsSkeleton() {
   );
 }
 
-function MessageListSkeleton() {
-  return (
-    <Card>
-      <CardContent className="pt-6 space-y-4">
-        <div className="flex gap-4">
-          <Skeleton className="h-10 w-40" />
-          <Skeleton className="h-10 w-40" />
-        </div>
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
-            <Skeleton className="h-10 w-10 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-48" />
-              <Skeleton className="h-3 w-64" />
-            </div>
-            <Skeleton className="h-6 w-20" />
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}

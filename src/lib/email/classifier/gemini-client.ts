@@ -2,7 +2,7 @@
  * Gemini API Client for Email Classification
  *
  * Wrapper around the Google Generative AI SDK for classifying emails.
- * Uses gemini-1.5-flash for fast, cost-effective classification.
+ * Uses gemini-2.0-flash for fast, cost-effective classification.
  */
 
 import { GoogleGenAI } from "@google/genai";
@@ -50,7 +50,7 @@ export async function classifyWithGemini(
     // Race between API call and timeout
     const result = await Promise.race([
       ai.models.generateContent({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         contents: prompt,
         config: {
           temperature: 0.1, // Low temperature for consistent classification
