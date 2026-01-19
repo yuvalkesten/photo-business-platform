@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Instagram, AlertCircle, CheckCircle2, Loader2, LogOut, ExternalLink } from "lucide-react";
-import { getInstagramStatus } from "@/actions/instagram";
+import { Instagram, AlertCircle, CheckCircle2, Loader2, LogOut, ExternalLink, RefreshCw } from "lucide-react";
+import { getInstagramStatus, triggerInstagramSync } from "@/actions/instagram";
 
 type ConnectionStatus = "loading" | "connected" | "disconnected" | "error" | "expired";
 
@@ -21,6 +21,8 @@ export function InstagramSettingsCard() {
   const [needsRenewal, setNeedsRenewal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ synced: number; skipped: number } | null>(null);
 
   useEffect(() => {
     async function fetchStatus() {
@@ -81,6 +83,34 @@ export function InstagramSettingsCard() {
         setError("Failed to disconnect Instagram account");
       }
     });
+  };
+
+  const handleSync = async () => {
+    setError(null);
+    setSyncResult(null);
+    setIsSyncing(true);
+
+    try {
+      const result = await triggerInstagramSync();
+
+      if (!result.success) {
+        setError(result.error || "Failed to sync messages");
+        return;
+      }
+
+      if (result.data) {
+        setSyncResult({
+          synced: result.data.synced,
+          skipped: result.data.skipped,
+        });
+      }
+
+      router.refresh();
+    } catch {
+      setError("Failed to sync Instagram messages");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const formatExpiration = (iso: string) => {
@@ -170,18 +200,32 @@ export function InstagramSettingsCard() {
             )}
 
             {status === "connected" && (
-              <Button
-                variant="outline"
-                onClick={handleDisconnect}
-                disabled={isPending}
-              >
-                {isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <LogOut className="h-4 w-4 mr-2" />
-                )}
-                Disconnect
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleSync}
+                  disabled={isPending || isSyncing}
+                >
+                  {isSyncing ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  {isSyncing ? "Syncing..." : "Sync Messages"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleDisconnect}
+                  disabled={isPending || isSyncing}
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <LogOut className="h-4 w-4 mr-2" />
+                  )}
+                  Disconnect
+                </Button>
+              </>
             )}
 
             {needsRenewal && status === "connected" && (
@@ -199,6 +243,18 @@ export function InstagramSettingsCard() {
             {error}
           </div>
         )}
+
+        {syncResult && syncResult.synced === 0 && syncResult.skipped === 0 ? (
+          <div className="mt-4 text-sm text-muted-foreground">
+            Historical sync is not available with Instagram Login.
+            New messages will be received automatically via webhooks when they arrive.
+          </div>
+        ) : syncResult ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-green-600">
+            <CheckCircle2 className="h-4 w-4" />
+            Synced {syncResult.synced} new messages ({syncResult.skipped} already existed)
+          </div>
+        ) : null}
 
         {status === "disconnected" && !error && (
           <p className="mt-4 text-sm text-muted-foreground">

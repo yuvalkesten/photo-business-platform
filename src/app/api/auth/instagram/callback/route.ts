@@ -1,17 +1,29 @@
 /**
- * Instagram OAuth Callback
+ * Instagram OAuth Callback (via Facebook Login)
  *
- * Handles the OAuth callback from Meta after the user authorizes the app.
- * Exchanges the authorization code for an access token and stores the Instagram account.
+ * Handles the OAuth callback from Facebook after the user authorizes the app.
+ * Uses Facebook Login to access Instagram through a linked Facebook Page.
+ *
+ * Flow:
+ * 1. Exchange authorization code for Facebook user access token
+ * 2. Exchange for long-lived token (60 days)
+ * 3. Get user's Facebook Pages
+ * 4. Find Page with linked Instagram Business account
+ * 5. Get Page Access Token (required for Instagram messaging)
+ * 6. Store Instagram account info with Page Access Token
+ * 7. Trigger historical message sync
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { syncHistoricalMessages } from "@/lib/instagram/sync";
 
 const META_APP_ID = process.env.META_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
 const NEXTAUTH_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
+
+const GRAPH_API_BASE = "https://graph.facebook.com/v18.0";
 
 interface StateData {
   userId: string;
@@ -52,7 +64,7 @@ interface InstagramAccountInfo {
 /**
  * GET /api/auth/instagram/callback
  *
- * Handles the OAuth callback from Meta.
+ * Handles the OAuth callback from Facebook.
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -64,8 +76,8 @@ export async function GET(request: NextRequest) {
 
   // Handle OAuth errors
   if (error) {
-    console.error("Instagram OAuth error:", { error, errorReason, errorDescription });
-    const errorUrl = new URL("/dashboard/settings", NEXTAUTH_URL);
+    console.error("Facebook OAuth error:", { error, errorReason, errorDescription });
+    const errorUrl = new URL("/dashboard/messages", NEXTAUTH_URL);
     errorUrl.searchParams.set("instagram_error", errorDescription || error);
     return NextResponse.redirect(errorUrl.toString());
   }
@@ -107,7 +119,7 @@ export async function GET(request: NextRequest) {
   try {
     // Step 1: Exchange the authorization code for a short-lived access token
     const redirectUri = `${NEXTAUTH_URL}/api/auth/instagram/callback`;
-    const tokenUrl = new URL("https://graph.facebook.com/v18.0/oauth/access_token");
+    const tokenUrl = new URL(`${GRAPH_API_BASE}/oauth/access_token`);
     tokenUrl.searchParams.set("client_id", META_APP_ID);
     tokenUrl.searchParams.set("client_secret", META_APP_SECRET);
     tokenUrl.searchParams.set("redirect_uri", redirectUri);
@@ -123,7 +135,7 @@ export async function GET(request: NextRequest) {
     const tokenData: TokenResponse = await tokenResponse.json();
 
     // Step 2: Exchange for a long-lived access token (60 days)
-    const longLivedUrl = new URL("https://graph.facebook.com/v18.0/oauth/access_token");
+    const longLivedUrl = new URL(`${GRAPH_API_BASE}/oauth/access_token`);
     longLivedUrl.searchParams.set("grant_type", "fb_exchange_token");
     longLivedUrl.searchParams.set("client_id", META_APP_ID);
     longLivedUrl.searchParams.set("client_secret", META_APP_SECRET);
@@ -137,12 +149,12 @@ export async function GET(request: NextRequest) {
     }
 
     const longLivedData: LongLivedTokenResponse = await longLivedResponse.json();
-    const accessToken = longLivedData.access_token;
-    const expiresIn = longLivedData.expires_in; // seconds until expiration
+    const userAccessToken = longLivedData.access_token;
+    const expiresIn = longLivedData.expires_in;
 
     // Step 3: Get the user's Facebook Pages
-    const pagesUrl = new URL("https://graph.facebook.com/v18.0/me/accounts");
-    pagesUrl.searchParams.set("access_token", accessToken);
+    const pagesUrl = new URL(`${GRAPH_API_BASE}/me/accounts`);
+    pagesUrl.searchParams.set("access_token", userAccessToken);
     pagesUrl.searchParams.set("fields", "id,name,access_token,instagram_business_account");
 
     const pagesResponse = await fetch(pagesUrl.toString());
@@ -170,7 +182,7 @@ export async function GET(request: NextRequest) {
     const pageAccessToken = pageWithInstagram.access_token;
 
     // Step 5: Get the Instagram account details
-    const instagramUrl = new URL(`https://graph.facebook.com/v18.0/${instagramAccountId}`);
+    const instagramUrl = new URL(`${GRAPH_API_BASE}/${instagramAccountId}`);
     instagramUrl.searchParams.set("access_token", pageAccessToken);
     instagramUrl.searchParams.set("fields", "id,username,name");
 
@@ -187,12 +199,13 @@ export async function GET(request: NextRequest) {
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000);
 
     // Step 7: Store or update the Instagram account in the database
+    // Note: We store the Page Access Token because it's needed for messaging
     await prisma.instagramAccount.upsert({
       where: { userId: session.user.id },
       update: {
         instagramUserId: instagramData.id,
         username: instagramData.username,
-        accessToken: pageAccessToken, // Use page token for messaging
+        accessToken: pageAccessToken, // Page token for messaging
         tokenExpiresAt,
         pageId: pageWithInstagram.id,
         pageName: pageWithInstagram.name,
@@ -215,10 +228,20 @@ export async function GET(request: NextRequest) {
       instagramUserId: instagramData.id,
       username: instagramData.username,
       pageId: pageWithInstagram.id,
+      pageName: pageWithInstagram.name,
     });
 
-    // Redirect to settings with success message
-    const successUrl = new URL("/dashboard/settings", NEXTAUTH_URL);
+    // Step 8: Trigger historical message sync in background (don't await)
+    syncHistoricalMessages(session.user.id, { maxDays: 30 })
+      .then((result) => {
+        console.log(`[Instagram Sync] Historical sync completed for user ${session.user.id}:`, result);
+      })
+      .catch((error) => {
+        console.error(`[Instagram Sync] Historical sync failed for user ${session.user.id}:`, error);
+      });
+
+    // Redirect to messages page with success message
+    const successUrl = new URL("/dashboard/messages", NEXTAUTH_URL);
     successUrl.searchParams.set("instagram_connected", "true");
     return NextResponse.redirect(successUrl.toString());
   } catch (error) {
@@ -231,7 +254,7 @@ export async function GET(request: NextRequest) {
  * Helper to redirect with an error message
  */
 function redirectWithError(message: string): NextResponse {
-  const errorUrl = new URL("/dashboard/settings", NEXTAUTH_URL);
+  const errorUrl = new URL("/dashboard/messages", NEXTAUTH_URL);
   errorUrl.searchParams.set("instagram_error", message);
   return NextResponse.redirect(errorUrl.toString());
 }

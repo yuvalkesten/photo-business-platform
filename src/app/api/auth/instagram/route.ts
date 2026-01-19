@@ -1,14 +1,16 @@
 /**
- * Instagram OAuth Initiation
+ * Instagram OAuth Initiation (via Facebook Login)
  *
- * Redirects the user to Meta's OAuth flow to connect their Instagram Business account.
- * The user must have an Instagram Business or Creator account linked to a Facebook Page.
+ * Redirects the user to Facebook's OAuth flow to connect their Instagram Business account.
+ * Uses Facebook Login to access Instagram through a linked Facebook Page.
+ * This approach enables access to the /conversations endpoint for historical DM sync.
  *
  * Required permissions:
- * - instagram_basic: Access basic account info
- * - instagram_manage_messages: Read and send DMs
- * - pages_show_list: List Facebook Pages (needed to find linked Instagram)
- * - pages_read_engagement: Read page info
+ * - instagram_basic: Access basic Instagram account info
+ * - instagram_manage_messages: Read and send Instagram DMs
+ * - pages_show_list: List Facebook Pages the user manages
+ * - pages_read_engagement: Read Page info
+ * - pages_messaging: Send messages via Page
  */
 
 import { NextResponse } from "next/server";
@@ -18,8 +20,8 @@ import crypto from "crypto";
 const META_APP_ID = process.env.META_APP_ID;
 const NEXTAUTH_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
 
-// OAuth scopes required for Instagram DM integration
-const INSTAGRAM_SCOPES = [
+// Facebook Login scopes for Instagram messaging via Pages
+const FACEBOOK_SCOPES = [
   "instagram_basic",
   "instagram_manage_messages",
   "pages_show_list",
@@ -30,7 +32,7 @@ const INSTAGRAM_SCOPES = [
 /**
  * GET /api/auth/instagram
  *
- * Initiates the Instagram OAuth flow by redirecting to Meta's authorization page.
+ * Initiates the Instagram OAuth flow by redirecting to Facebook's authorization page.
  */
 export async function GET() {
   // Verify user is authenticated
@@ -58,16 +60,16 @@ export async function GET() {
   };
   const state = Buffer.from(JSON.stringify(stateData)).toString("base64url");
 
-  // Build the Meta OAuth URL
+  // Build the Facebook OAuth URL
   const redirectUri = `${NEXTAUTH_URL}/api/auth/instagram/callback`;
 
   const authUrl = new URL("https://www.facebook.com/v18.0/dialog/oauth");
   authUrl.searchParams.set("client_id", META_APP_ID);
   authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("scope", INSTAGRAM_SCOPES);
+  authUrl.searchParams.set("scope", FACEBOOK_SCOPES);
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("state", state);
 
-  // Redirect to Meta's OAuth page
+  // Redirect to Facebook's OAuth page
   return NextResponse.redirect(authUrl.toString());
 }
