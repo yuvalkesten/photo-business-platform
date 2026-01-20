@@ -3,7 +3,8 @@ import Link from "next/link"
 import { requireAuth } from "@/lib/auth/utils"
 import { getProject } from "@/actions/projects"
 import { deleteProject } from "@/actions/projects/delete-project"
-import { ProjectStatus, ProjectType, PhotoSessionStatus } from "@prisma/client"
+import { getInvoices } from "@/actions/invoices"
+import { ProjectStatus, ProjectType, PhotoSessionStatus, InvoiceStatus } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +23,8 @@ import {
   ImageIcon,
   Plus,
   Clock,
+  FileText,
+  Receipt,
 } from "lucide-react"
 
 interface ProjectDetailPageProps {
@@ -72,18 +75,40 @@ const sessionStatusColors: Record<PhotoSessionStatus, string> = {
   CANCELLED: "bg-red-100 text-red-800",
 }
 
+const invoiceStatusLabels: Record<InvoiceStatus, string> = {
+  DRAFT: "Draft",
+  SENT: "Sent",
+  VIEWED: "Viewed",
+  PAID: "Paid",
+  OVERDUE: "Overdue",
+  CANCELLED: "Cancelled",
+}
+
+const invoiceStatusColors: Record<InvoiceStatus, string> = {
+  DRAFT: "bg-gray-100 text-gray-800",
+  SENT: "bg-blue-100 text-blue-800",
+  VIEWED: "bg-yellow-100 text-yellow-800",
+  PAID: "bg-green-100 text-green-800",
+  OVERDUE: "bg-red-100 text-red-800",
+  CANCELLED: "bg-gray-100 text-gray-500",
+}
+
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const user = await requireAuth()
   if (!user) redirect("/auth/signin")
 
   const { id } = await params
-  const result = await getProject(id)
+  const [projectResult, invoicesResult] = await Promise.all([
+    getProject(id),
+    getInvoices({ projectId: id }),
+  ])
 
-  if (result.error || !result.project) {
+  if (projectResult.error || !projectResult.project) {
     notFound()
   }
 
-  const { project } = result
+  const { project } = projectResult
+  const invoices = invoicesResult.invoices || []
   const contact = project.contact
   const initials = `${contact.firstName[0]}${contact.lastName[0]}`.toUpperCase()
 
@@ -190,8 +215,14 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
 
           {/* Financial Summary */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Financials</CardTitle>
+              <Button size="sm" variant="outline" asChild>
+                <Link href={`/dashboard/invoices/new?projectId=${id}`}>
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Create Invoice
+                </Link>
+              </Button>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
@@ -212,6 +243,61 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                   ${remaining.toLocaleString()}
                 </span>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Invoices */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Invoices
+              </CardTitle>
+              <CardDescription>
+                {invoices.length} invoice(s) for this project
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invoices.length > 0 ? (
+                <div className="space-y-2">
+                  {invoices.map((invoice) => {
+                    const isOverdue =
+                      invoice.status !== InvoiceStatus.PAID &&
+                      invoice.status !== InvoiceStatus.CANCELLED &&
+                      new Date(invoice.dueDate) < new Date()
+                    return (
+                      <Link
+                        key={invoice.id}
+                        href={`/dashboard/invoices/${invoice.id}`}
+                        className="block"
+                      >
+                        <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors">
+                          <div>
+                            <p className="font-medium">{invoice.invoiceNumber}</p>
+                            <p className="text-sm text-muted-foreground">
+                              ${invoice.total.toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge
+                            className={
+                              isOverdue
+                                ? invoiceStatusColors.OVERDUE
+                                : invoiceStatusColors[invoice.status]
+                            }
+                          >
+                            {isOverdue ? "Overdue" : invoiceStatusLabels[invoice.status]}
+                          </Badge>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No invoices yet</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

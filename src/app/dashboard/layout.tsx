@@ -31,6 +31,7 @@ import {
   Calendar,
   Mail,
   MessageCircle,
+  Receipt,
 } from "lucide-react"
 
 const navigation = [
@@ -42,6 +43,7 @@ const navigation = [
   { name: "Organizations", href: "/dashboard/organizations", icon: Building2 },
   { name: "Leads", href: "/dashboard/leads", icon: Target },
   { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
+  { name: "Invoices", href: "/dashboard/invoices", icon: Receipt },
   { name: "Galleries", href: "/dashboard/galleries", icon: ImageIcon },
 ]
 

@@ -4,6 +4,17 @@
 
 ## Recent Completions
 
+### Invoice Generation (Jan 20, 2026)
+- Invoice model with line items stored as JSON
+- Create invoices from projects with custom line items
+- Professional invoice preview and email template
+- Send invoices via Gmail API
+- PDF generation with React-PDF
+- Invoice status tracking (Draft, Sent, Paid, Overdue)
+- Invoice list with statistics dashboard
+- Create Invoice button on project detail page
+- Invoices navigation in sidebar
+
 ### Instagram DM Integration (Jan 20, 2026)
 - Instagram Business account OAuth via Facebook Login for Business
 - Real-time webhook processing for incoming DMs
@@ -63,6 +74,14 @@ NEXTAUTH_URL="https://your-ngrok-url.ngrok-free.dev"
 ```
 
 ## Key Files
+- `src/app/dashboard/invoices/page.tsx` - Invoice list dashboard
+- `src/app/dashboard/invoices/new/page.tsx` - Create new invoice
+- `src/app/dashboard/invoices/[id]/page.tsx` - View invoice
+- `src/components/features/invoices/` - Invoice components
+- `src/actions/invoices/` - Invoice CRUD actions
+- `src/lib/invoices/InvoicePDF.tsx` - PDF template
+- `src/lib/email/templates/invoice.ts` - Email template
+- `src/app/api/invoices/[id]/pdf/route.ts` - PDF generation API
 - `src/app/dashboard/messages/page.tsx` - Instagram messages dashboard
 - `src/app/dashboard/emails/page.tsx` - Email dashboard
 - `src/components/features/emails/EmailDetailSheet.tsx` - Email detail drawer

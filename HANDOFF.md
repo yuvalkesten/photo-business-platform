@@ -68,6 +68,15 @@ All core features are implemented and functional.
 - Messages dashboard with filtering and stats
 - Real-time updates with polling
 
+### Invoice Generation
+- Create invoices from projects with line items
+- Preview invoices before sending
+- Send invoices via email (Gmail API)
+- PDF generation and download (React-PDF)
+- Track invoice status (Draft, Sent, Paid, Overdue)
+- Invoice list with filtering and statistics
+- Create Invoice button on project pages
+
 ---
 
 ## Key Files Reference
@@ -105,6 +114,9 @@ All core features are implemented and functional.
 | `/dashboard/galleries` | Gallery management |
 | `/dashboard/emails` | Email classification dashboard |
 | `/dashboard/messages` | Instagram DM dashboard |
+| `/dashboard/invoices` | Invoice management |
+| `/dashboard/invoices/new` | Create new invoice |
+| `/dashboard/invoices/[id]` | View invoice details |
 | `/gallery/[token]` | Public gallery view |
 
 ---

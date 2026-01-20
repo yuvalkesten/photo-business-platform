@@ -29,6 +29,7 @@ model User {
   galleries          Gallery[]
   instagramAccount   InstagramAccount?
   organizations      Organization[]
+  invoices           Invoice[]
   processedEmails    ProcessedEmail[]
   processedMessages  ProcessedMessage[]
   projects           Project[]
@@ -167,6 +168,7 @@ model Project {
   lostReason        LostReason?
   nextFollowUpDate  DateTime?
   galleries         Gallery[]
+  invoices          Invoice[]
   sessions          PhotoSession[]
   processedEmails   ProcessedEmail[]
   processedMessages ProcessedMessage[]
@@ -302,6 +304,48 @@ model ProcessedEmail {
   @@map("processed_emails")
 }
 
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  userId        String
+  projectId     String
+
+  // Amounts
+  subtotal      Decimal       @db.Decimal(10, 2)
+  tax           Decimal?      @db.Decimal(10, 2)
+  taxRate       Decimal?      @db.Decimal(5, 2)
+  total         Decimal       @db.Decimal(10, 2)
+  amountPaid    Decimal       @default(0) @db.Decimal(10, 2)
+
+  // Dates
+  invoiceDate   DateTime      @default(now())
+  dueDate       DateTime
+  paidAt        DateTime?
+
+  // Status
+  status        InvoiceStatus @default(DRAFT)
+
+  // Content
+  lineItems     Json          // [{description, quantity, unitPrice, amount}]
+  notes         String?
+
+  // Tracking
+  sentAt        DateTime?
+  sentToEmail   String?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([userId, status])
+  @@map("invoices")
+}
+
 model FinancialDocument {
   id               String          @id @default(cuid())
   userId           String
@@ -432,6 +476,15 @@ enum DocumentStatus {
   APPROVED
   REJECTED
   ARCHIVED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PAID
+  OVERDUE
+  CANCELLED
 }
 
 enum MessagePlatform {
