@@ -65,7 +65,7 @@ export async function updateEmailClassification(
       where: { id: emailId },
       data: {
         classification: newClassification,
-        classificationData: updatedClassificationData,
+        classificationData: JSON.stringify(updatedClassificationData),
         // Reset status to CLASSIFIED since this is a manual correction
         status: "CLASSIFIED",
       },
