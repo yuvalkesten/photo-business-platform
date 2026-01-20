@@ -53,10 +53,20 @@ All core features are implemented and functional.
 - Individual and bulk download
 
 ### Email Integration
-- Booking confirmation emails (auto on project booking)
-- Gallery ready notifications (manual send)
-- Professional HTML templates
-- Uses Gmail API with OAuth tokens
+- Gmail push notifications via Google Pub/Sub
+- AI-powered email classification (Inquiry, Urgent, Invoice, Receipt, Other)
+- Auto-creation of contacts/projects from inquiry emails
+- Email detail view with side drawer
+- Manual re-classification support
+- Real-time updates with React Query polling (10-second refresh)
+
+### Instagram DM Integration
+- Instagram Business account OAuth via Facebook Login
+- Real-time DM processing via Meta webhooks
+- AI-powered DM classification
+- Auto-creation of contacts/projects from DM inquiries
+- Messages dashboard with filtering and stats
+- Real-time updates with polling
 
 ---
 
@@ -93,6 +103,8 @@ All core features are implemented and functional.
 | `/dashboard/projects` | Project management |
 | `/dashboard/calendar` | Calendar view |
 | `/dashboard/galleries` | Gallery management |
+| `/dashboard/emails` | Email classification dashboard |
+| `/dashboard/messages` | Instagram DM dashboard |
 | `/gallery/[token]` | Public gallery view |
 
 ---
@@ -112,6 +124,10 @@ AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 AWS_S3_BUCKET_NAME
 NEXT_PUBLIC_APP_URL
+GEMINI_API_KEY
+META_APP_ID
+META_APP_SECRET
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN
 ```
 
 ---
@@ -177,4 +193,4 @@ Using Neon PostgreSQL with pooled connection. Connection string must:
 ---
 
 **Status:** Production ready
-**Last Updated:** January 10, 2026
+**Last Updated:** January 20, 2026

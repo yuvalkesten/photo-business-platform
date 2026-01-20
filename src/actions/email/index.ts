@@ -10,3 +10,5 @@ export { getEmailWatchStatus } from "./get-email-watch-status";
 export { getProcessedEmails } from "./get-processed-emails";
 export { getEmailStats } from "./get-email-stats";
 export { retryFailedEmails } from "./retry-failed-emails";
+export { getEmailDetail } from "./get-email-detail";
+export { updateEmailClassification } from "./update-email-classification";

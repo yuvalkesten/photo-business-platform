@@ -1,89 +1,74 @@
 # Current Task
 
-## Status: IN_PROGRESS
+## Status: COMPLETED
 
-## Task Description
-Instagram DM Integration - Testing OAuth Flow Locally
+## Recent Completions
 
-## Current Focus
-Test the Instagram OAuth connection flow on local machine
+### Instagram DM Integration (Jan 20, 2026)
+- Instagram Business account OAuth via Facebook Login for Business
+- Real-time webhook processing for incoming DMs
+- AI classification of DMs using Gemini
+- Auto-creation of contacts/projects from inquiries
+- Messages dashboard with filtering and stats
+- Real-time polling (10-second refresh)
 
-## Context for Local Development
-The Instagram integration code is complete and builds successfully. The remaining work is testing the OAuth flow with Facebook/Meta.
+### Email Detail View (Jan 20, 2026)
+- Clickable email rows open side drawer
+- Full email content displayed from Gmail API
+- AI analysis details (confidence, summary, suggested action)
+- Manual re-classification support
+- Linked entities display (contacts, projects, financial docs)
 
-### What's Been Done
-- Instagram messages dashboard at `/dashboard/messages`
-- OAuth flow for connecting Instagram Business accounts (`/api/auth/instagram`)
-- DM message processing pipeline with AI classification
-- Auto-creation of contacts/projects from DM inquiries
-- All TypeScript errors fixed, build passes
+### Real-time Updates (Jan 20, 2026)
+- React Query polling for both emails and Instagram messages
+- 10-second auto-refresh when tab is active
+- Visual indicator during background refresh
 
-### What Needs Testing
-1. Instagram OAuth flow - connecting an Instagram Business account
-2. Webhook verification with Facebook
-3. End-to-end DM processing
+## What's Working
+- Instagram OAuth flow with Facebook Login for Business
+- Instagram webhooks receiving and processing DMs
+- Email classification and detail view
+- All dashboards with real-time updates
 
-### Facebook/Meta App Configuration Required
-The Meta app (ID: 816961488060840) needs these URLs configured:
+## Environment Setup
 
-**For localhost testing:**
-1. **App Domains** (Settings → Basic): `localhost`
-2. **Valid OAuth Redirect URIs** (Facebook Login → Settings):
-   - `http://localhost:3000/api/auth/instagram/callback`
-3. **Webhook URL** (Webhooks): Cannot use localhost directly - need ngrok or similar for HTTPS
-
-**Webhook Verify Token:**
+### Required Environment Variables
 ```
-a8aa3c43c6b25422b67f26aa53a8c6b93ed9b83170cc94af0e67107244e2fc13
+# Meta/Instagram
+META_APP_ID="816961488060840"
+META_APP_SECRET="your-secret"
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN="your-token"
+
+# AI Classification
+GEMINI_API_KEY="your-key"
+
+# Standard NextAuth + Database + AWS vars...
 ```
 
-### Google OAuth Configuration
-Add to Google Cloud Console (APIs & Services → Credentials → OAuth Client):
-- `http://localhost:3000/api/auth/callback/google`
+### Meta Developer Console
+- App ID: 816961488060840
+- Facebook Login for Business configured
+- Webhooks subscribed to `messages` field
+- App must be in "published" state for webhooks to work
 
-### Environment Variables (.env.local)
-Ensure these are set correctly:
-- `NEXTAUTH_URL="http://localhost:3000"`
-- `META_APP_ID="816961488060840"` (no trailing newline!)
-- `META_APP_SECRET` - your Facebook app secret
-- `INSTAGRAM_WEBHOOK_VERIFY_TOKEN` - for webhook verification
-
-### Known Issues
-1. Facebook OAuth requires the ngrok domain to be added to "App Domains" - may need ngrok for testing
-2. Webhooks require HTTPS - need ngrok or deploy to Vercel for webhook testing
-
-### Commands
+### Local Development with ngrok
 ```bash
-# Start dev server (use increased memory for builds)
-NODE_OPTIONS="--max-old-space-size=2560" npm run dev
-
-# Build
-NODE_OPTIONS="--max-old-space-size=2560" npm run build
-
-# If using ngrok for HTTPS testing
+# Start ngrok
 ngrok http 3000
-# Then update NEXTAUTH_URL in .env.local to the ngrok URL
+
+# Update .env.local
+NEXTAUTH_URL="https://your-ngrok-url.ngrok-free.dev"
+
+# Add ngrok domain to Meta app settings
 ```
 
-## Completed Steps
-- [x] Added Instagram messages dashboard and components
-- [x] Fixed TypeScript errors in Instagram integration
-- [x] Set up EC2 with swap (2GB) and memory limits
-- [x] Tested remote access via ngrok
-- [x] Identified Facebook app domain configuration requirements
-
-## Next Steps
-- [ ] Configure Facebook app domains for localhost (or ngrok)
-- [ ] Test Instagram OAuth flow
-- [ ] Verify webhook setup
-- [ ] Test end-to-end DM classification
-
-## Files to Review
-- `src/app/dashboard/messages/page.tsx` - Messages dashboard
-- `src/app/api/auth/instagram/route.ts` - OAuth initiation
-- `src/app/api/auth/instagram/callback/route.ts` - OAuth callback
-- `src/app/api/webhooks/instagram/route.ts` - Webhook handler
-- `src/lib/instagram/` - Instagram client and utilities
+## Key Files
+- `src/app/dashboard/messages/page.tsx` - Instagram messages dashboard
+- `src/app/dashboard/emails/page.tsx` - Email dashboard
+- `src/components/features/emails/EmailDetailSheet.tsx` - Email detail drawer
+- `src/components/features/instagram/InstagramMessagesClient.tsx` - Real-time messages
+- `src/app/api/webhooks/instagram/route.ts` - Instagram webhook handler
+- `src/lib/email/classifier/` - AI classification logic
 
 ## Last Updated
-2026-01-17
+2026-01-20
