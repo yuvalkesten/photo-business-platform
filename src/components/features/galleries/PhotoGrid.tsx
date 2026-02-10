@@ -21,6 +21,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Trash2,
   ImageIcon,
   MoreVertical,
@@ -29,10 +34,12 @@ import {
   Star,
   GripVertical,
   Loader2,
+  FolderOpen,
 } from "lucide-react"
 import { deletePhotos } from "@/actions/galleries/delete-photos"
 import { updatePhotoOrder } from "@/actions/galleries/update-photo-order"
 import { setCoverImage } from "@/actions/galleries/set-cover-image"
+import { assignPhotosToSet } from "@/actions/galleries/photo-sets"
 import { useToast } from "@/hooks/use-toast"
 
 interface Photo {
@@ -44,15 +51,22 @@ interface Photo {
   width: number
   height: number
   order: number
+  setId?: string | null
+}
+
+interface PhotoSet {
+  id: string
+  name: string
 }
 
 interface PhotoGridProps {
   galleryId: string
   photos: Photo[]
   coverImage: string | null
+  photoSets?: PhotoSet[]
 }
 
-export function PhotoGrid({ galleryId, photos, coverImage }: PhotoGridProps) {
+export function PhotoGrid({ galleryId, photos, coverImage, photoSets = [] }: PhotoGridProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectMode, setSelectMode] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -153,6 +167,22 @@ export function PhotoGrid({ galleryId, photos, coverImage }: PhotoGridProps) {
     })
   }
 
+  const handleMoveToSet = (photoIds: string[], setId: string | null) => {
+    startTransition(async () => {
+      const result = await assignPhotosToSet(galleryId, photoIds, setId)
+      if (result.error) {
+        toast({ title: "Error", description: result.error, variant: "destructive" })
+      } else {
+        toast({ title: "Photos moved", description: "Photos have been moved to the set." })
+        if (selectMode) {
+          setSelectedIds(new Set())
+          setSelectMode(false)
+        }
+        router.refresh()
+      }
+    })
+  }
+
   const isCover = (photo: Photo) => {
     return coverImage === photo.thumbnailUrl || coverImage === photo.s3Url
   }
@@ -188,15 +218,40 @@ export function PhotoGrid({ galleryId, photos, coverImage }: PhotoGridProps) {
                 Select all
               </Button>
               {selectedIds.size > 0 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setDeleteDialogOpen(true)}
-                  disabled={isPending}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete ({selectedIds.size})
-                </Button>
+                <>
+                  {photoSets.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={isPending}>
+                          <FolderOpen className="h-4 w-4 mr-2" />
+                          Move to set
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {photoSets.map((set) => (
+                          <DropdownMenuItem
+                            key={set.id}
+                            onClick={() => handleMoveToSet(Array.from(selectedIds), set.id)}
+                          >
+                            {set.name}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuItem onClick={() => handleMoveToSet(Array.from(selectedIds), null)}>
+                          Uncategorized
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={isPending}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete ({selectedIds.size})
+                  </Button>
+                </>
               )}
             </>
           )}
@@ -277,6 +332,27 @@ export function PhotoGrid({ galleryId, photos, coverImage }: PhotoGridProps) {
                         <Star className="h-4 w-4 mr-2" />
                         Set as cover
                       </DropdownMenuItem>
+                      {photoSets.length > 0 && (
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <FolderOpen className="h-4 w-4 mr-2" />
+                            Move to set
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            {photoSets.map((set) => (
+                              <DropdownMenuItem
+                                key={set.id}
+                                onClick={() => handleMoveToSet([photo.id], set.id)}
+                              >
+                                {set.name}
+                              </DropdownMenuItem>
+                            ))}
+                            <DropdownMenuItem onClick={() => handleMoveToSet([photo.id], null)}>
+                              Uncategorized
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )}
                       <DropdownMenuItem
                         className="text-destructive"
                         onClick={() => {

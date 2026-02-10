@@ -58,6 +58,14 @@ export async function createGallery(data: unknown) {
         expiresAt: validatedData.expiresAt,
         allowDownload: validatedData.allowDownload,
         watermark: validatedData.watermark,
+        requireEmail: validatedData.requireEmail,
+        theme: validatedData.theme,
+        gridStyle: validatedData.gridStyle,
+        fontFamily: validatedData.fontFamily,
+        primaryColor: validatedData.primaryColor,
+        accentColor: validatedData.accentColor,
+        downloadResolution: validatedData.downloadResolution,
+        favoriteLimit: validatedData.favoriteLimit ?? null,
       },
       include: {
         project: {

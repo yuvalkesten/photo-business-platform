@@ -3,9 +3,13 @@
 import { requireAuth } from "@/lib/auth/utils"
 import { prisma } from "@/lib/db"
 import { sendEmail } from "@/lib/google/gmail"
-import { generateGalleryReadyEmail } from "@/lib/email/templates"
+import { generateGalleryReadyEmail, type EmailTemplate } from "@/lib/email/templates"
 
-export async function sendGalleryEmail(galleryId: string, includePassword?: boolean) {
+export async function sendGalleryEmail(
+  galleryId: string,
+  template: EmailTemplate = "classic",
+  includePassword?: boolean
+) {
   try {
     const user = await requireAuth()
 
@@ -76,7 +80,7 @@ export async function sendGalleryEmail(galleryId: string, includePassword?: bool
       photographerEmail: photographer?.businessEmail || photographer?.email || "",
     }
 
-    const { subject, htmlBody, textBody } = generateGalleryReadyEmail(emailData)
+    const { subject, htmlBody, textBody } = generateGalleryReadyEmail(emailData, template)
 
     await sendEmail(user.id, {
       to: gallery.contact.email,

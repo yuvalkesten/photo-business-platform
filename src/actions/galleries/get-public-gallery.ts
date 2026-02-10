@@ -13,11 +13,23 @@ export async function getPublicGallery(shareToken: string, password?: string) {
           select: {
             id: true,
             filename: true,
+            s3Key: true,
             s3Url: true,
             thumbnailUrl: true,
             watermarkedUrl: true,
             width: true,
             height: true,
+            setId: true,
+          },
+        },
+        photoSets: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            coverImage: true,
+            order: true,
           },
         },
         project: {
@@ -32,6 +44,10 @@ export async function getPublicGallery(shareToken: string, password?: string) {
             businessName: true,
             businessEmail: true,
             businessPhone: true,
+            brandLogo: true,
+            brandFavicon: true,
+            brandPrimaryColor: true,
+            brandAccentColor: true,
           },
         },
       },
@@ -63,9 +79,11 @@ export async function getPublicGallery(shareToken: string, password?: string) {
       id: photo.id,
       filename: photo.filename,
       s3Url: gallery.watermark && photo.watermarkedUrl ? photo.watermarkedUrl : photo.s3Url,
+      originalS3Key: photo.s3Key,
       thumbnailUrl: photo.thumbnailUrl,
       width: photo.width,
       height: photo.height,
+      setId: photo.setId,
     }))
 
     // Return gallery without sensitive data
@@ -81,12 +99,27 @@ export async function getPublicGallery(shareToken: string, password?: string) {
         requireEmail: gallery.requireEmail,
         expiresAt: gallery.expiresAt,
         shareToken: gallery.shareToken,
+        // Theming
+        theme: gallery.theme,
+        gridStyle: gallery.gridStyle,
+        fontFamily: gallery.fontFamily,
+        primaryColor: gallery.primaryColor,
+        accentColor: gallery.accentColor,
+        // Download options
+        downloadResolution: gallery.downloadResolution,
+        favoriteLimit: gallery.favoriteLimit,
+        // Content
         photos: publicPhotos,
+        photoSets: gallery.photoSets,
         project: gallery.project,
         photographer: {
           name: gallery.user.businessName || gallery.user.name,
           email: gallery.user.businessEmail,
           phone: gallery.user.businessPhone,
+          brandLogo: gallery.user.brandLogo,
+          brandFavicon: gallery.user.brandFavicon,
+          brandPrimaryColor: gallery.user.brandPrimaryColor,
+          brandAccentColor: gallery.user.brandAccentColor,
         },
       },
     }

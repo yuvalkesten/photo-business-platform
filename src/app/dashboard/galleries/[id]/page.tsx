@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { requireAuth } from "@/lib/auth/utils"
-import { getGallery, getGalleryVisitors, getFavoriteLists } from "@/actions/galleries"
+import { getGallery, getGalleryVisitors, getFavoriteLists, getDownloadStats } from "@/actions/galleries"
 import { deleteGallery } from "@/actions/galleries/delete-gallery"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,10 +24,15 @@ import {
   Upload,
   Mail,
   Heart,
+  FolderOpen,
+  FileDown,
 } from "lucide-react"
 import { SendGalleryButton } from "@/components/features/galleries/SendGalleryButton"
 import { PhotoUploader } from "@/components/features/galleries/PhotoUploader"
 import { PhotoGrid } from "@/components/features/galleries/PhotoGrid"
+import { PhotoSetManager } from "@/components/features/galleries/PhotoSetManager"
+import { QRCodeCard } from "@/components/features/galleries/QRCodeCard"
+import { DownloadStats } from "@/components/features/galleries/DownloadStats"
 
 interface GalleryDetailPageProps {
   params: Promise<{ id: string }>
@@ -49,6 +54,7 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
   const visitors = visitorsResult.visitors || []
   const favoritesResult = await getFavoriteLists(id)
   const favoriteLists = favoritesResult.lists || []
+  const downloadStatsResult = await getDownloadStats(id)
   // Use NEXTAUTH_URL for production, fall back to NEXT_PUBLIC_APP_URL or localhost
   const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   const shareUrl = `${baseUrl}/gallery/${gallery.shareToken}`
@@ -158,6 +164,14 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
             </CardContent>
           </Card>
 
+          {/* QR Code */}
+          <QRCodeCard shareUrl={shareUrl} galleryTitle={gallery.title} />
+
+          {/* Download Analytics */}
+          {downloadStatsResult.stats && (
+            <DownloadStats stats={downloadStatsResult.stats} />
+          )}
+
           {/* Project Info */}
           <Card>
             <CardHeader>
@@ -215,6 +229,14 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Photos</span>
                 <span className="font-medium">{gallery.photos?.length || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Theme</span>
+                <span className="font-medium capitalize">{gallery.theme || "classic"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Grid</span>
+                <span className="font-medium capitalize">{gallery.gridStyle || "grid"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
@@ -293,6 +315,31 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
             </CardContent>
           </Card>
 
+          {/* Photo Sets */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FolderOpen className="h-5 w-5" />
+                Photo Sets
+              </CardTitle>
+              <CardDescription>
+                Organize photos into sections (e.g. Ceremony, Reception)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PhotoSetManager
+                galleryId={id}
+                sets={(gallery.photoSets || []).map((s: any) => ({
+                  id: s.id,
+                  name: s.name,
+                  description: s.description,
+                  order: s.order,
+                  _count: s._count,
+                }))}
+              />
+            </CardContent>
+          </Card>
+
           {/* Photo Grid */}
           <Card>
             <CardHeader>
@@ -304,7 +351,7 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
             <CardContent>
               <PhotoGrid
                 galleryId={id}
-                photos={(gallery.photos || []).map((p) => ({
+                photos={(gallery.photos || []).map((p: any) => ({
                   id: p.id,
                   filename: p.filename,
                   s3Url: p.s3Url,
@@ -313,8 +360,13 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
                   width: p.width,
                   height: p.height,
                   order: p.order,
+                  setId: p.setId,
                 }))}
                 coverImage={gallery.coverImage}
+                photoSets={(gallery.photoSets || []).map((s: any) => ({
+                  id: s.id,
+                  name: s.name,
+                }))}
               />
             </CardContent>
           </Card>
@@ -323,16 +375,26 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
           {favoriteLists.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5" />
-                  Client Favorites ({favoriteLists.length})
-                </CardTitle>
-                <CardDescription>
-                  Favorite selections submitted by gallery visitors
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Heart className="h-5 w-5" />
+                      Client Favorites ({favoriteLists.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Favorite selections submitted by gallery visitors
+                    </CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`/api/galleries/${id}/favorites/export`} download>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </a>
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {favoriteLists.map((list) => (
+                {favoriteLists.map((list: any) => (
                   <div key={list.id} className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -356,16 +418,21 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
                       </p>
                     )}
                     <div className="grid grid-cols-4 sm:grid-cols-6 gap-1">
-                      {list.photos.map((fp) => (
+                      {list.photos.map((fp: any) => (
                         <div
                           key={fp.id}
-                          className="aspect-square rounded overflow-hidden bg-muted"
+                          className="aspect-square rounded overflow-hidden bg-muted relative"
                         >
                           <img
                             src={fp.photo.thumbnailUrl || fp.photo.s3Url}
                             alt={fp.photo.filename}
                             className="w-full h-full object-cover"
                           />
+                          {fp.comment && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
+                              <p className="text-white text-[10px] truncate">{fp.comment}</p>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

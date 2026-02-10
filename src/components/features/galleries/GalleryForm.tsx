@@ -15,6 +15,12 @@ type SerializedProject = {
 import { gallerySchema, type GalleryFormData } from "@/lib/validations/gallery.schema"
 import { createGallery } from "@/actions/galleries/create-gallery"
 import { updateGallery } from "@/actions/galleries/update-gallery"
+import {
+  GALLERY_THEMES,
+  GALLERY_GRID_STYLES,
+  GALLERY_FONTS,
+  DOWNLOAD_RESOLUTIONS,
+} from "@/lib/gallery-themes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -63,6 +69,15 @@ export function GalleryForm({
       allowDownload: gallery?.allowDownload ?? true,
       watermark: gallery?.watermark || false,
       requireEmail: gallery?.requireEmail || false,
+      // Theming
+      theme: (gallery?.theme as GalleryFormData["theme"]) || "classic",
+      gridStyle: (gallery?.gridStyle as GalleryFormData["gridStyle"]) || "grid",
+      fontFamily: (gallery?.fontFamily as GalleryFormData["fontFamily"]) || "inter",
+      primaryColor: gallery?.primaryColor || "#000000",
+      accentColor: gallery?.accentColor || "#8b5cf6",
+      // Download options
+      downloadResolution: (gallery?.downloadResolution as GalleryFormData["downloadResolution"]) || "original",
+      favoriteLimit: gallery?.favoriteLimit ?? undefined,
     },
   })
 
@@ -170,6 +185,120 @@ export function GalleryForm({
         </CardContent>
       </Card>
 
+      {/* Design / Theming */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Design</CardTitle>
+          <CardDescription>Customize the look and feel of your gallery</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Theme</Label>
+              <Select
+                value={form.watch("theme")}
+                onValueChange={(value) => form.setValue("theme", value as GalleryFormData["theme"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(GALLERY_THEMES).map(([key, theme]) => (
+                    <SelectItem key={key} value={key}>
+                      {theme.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {GALLERY_THEMES[form.watch("theme") || "classic"]?.description}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Grid Layout</Label>
+              <Select
+                value={form.watch("gridStyle")}
+                onValueChange={(value) => form.setValue("gridStyle", value as GalleryFormData["gridStyle"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(GALLERY_GRID_STYLES).map(([key, style]) => (
+                    <SelectItem key={key} value={key}>
+                      {style.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {GALLERY_GRID_STYLES[form.watch("gridStyle") || "grid"]?.description}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Font</Label>
+              <Select
+                value={form.watch("fontFamily")}
+                onValueChange={(value) => form.setValue("fontFamily", value as GalleryFormData["fontFamily"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(GALLERY_FONTS).map(([key, font]) => (
+                    <SelectItem key={key} value={key}>
+                      {font.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="primaryColor">Primary Color</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  id="primaryColor"
+                  value={form.watch("primaryColor") || "#000000"}
+                  onChange={(e) => form.setValue("primaryColor", e.target.value)}
+                  className="h-10 w-10 rounded border cursor-pointer"
+                />
+                <Input
+                  value={form.watch("primaryColor") || "#000000"}
+                  onChange={(e) => form.setValue("primaryColor", e.target.value)}
+                  className="font-mono text-sm"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="accentColor">Accent Color</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  id="accentColor"
+                  value={form.watch("accentColor") || "#8b5cf6"}
+                  onChange={(e) => form.setValue("accentColor", e.target.value)}
+                  className="h-10 w-10 rounded border cursor-pointer"
+                />
+                <Input
+                  value={form.watch("accentColor") || "#8b5cf6"}
+                  onChange={(e) => form.setValue("accentColor", e.target.value)}
+                  className="font-mono text-sm"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Access Settings */}
       <Card>
         <CardHeader>
@@ -239,8 +368,8 @@ export function GalleryForm({
       {/* Download Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Download Settings</CardTitle>
-          <CardDescription>Control download and watermark options</CardDescription>
+          <CardTitle>Download & Proofing Settings</CardTitle>
+          <CardDescription>Control download, watermark, and proofing options</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
@@ -257,6 +386,30 @@ export function GalleryForm({
             />
           </div>
 
+          {form.watch("allowDownload") && (
+            <div className="space-y-2">
+              <Label>Download Resolution</Label>
+              <Select
+                value={form.watch("downloadResolution")}
+                onValueChange={(value) => form.setValue("downloadResolution", value as GalleryFormData["downloadResolution"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(DOWNLOAD_RESOLUTIONS).map(([key, res]) => (
+                    <SelectItem key={key} value={key}>
+                      {res.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {DOWNLOAD_RESOLUTIONS[form.watch("downloadResolution") || "original"]?.description}
+              </p>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="watermark">Apply Watermark</Label>
@@ -269,6 +422,20 @@ export function GalleryForm({
               checked={form.watch("watermark")}
               onCheckedChange={(checked) => form.setValue("watermark", checked)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="favoriteLimit">Favorite Selection Limit</Label>
+            <Input
+              id="favoriteLimit"
+              type="number"
+              min={1}
+              {...form.register("favoriteLimit")}
+              placeholder="Unlimited"
+            />
+            <p className="text-sm text-muted-foreground">
+              Maximum number of photos a client can select as favorites. Leave blank for unlimited.
+            </p>
           </div>
         </CardContent>
       </Card>

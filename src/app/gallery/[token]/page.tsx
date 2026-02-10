@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: PublicGalleryPageProps): Prom
   const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   const url = `${baseUrl}/gallery/${token}`
 
-  return {
+  const metadata: Metadata = {
     title: gallery.title,
     description: gallery.description || `${gallery.photos.length} photos from ${gallery.project.name}`,
     openGraph: {
@@ -40,6 +40,13 @@ export async function generateMetadata({ params }: PublicGalleryPageProps): Prom
       images: gallery.coverImage ? [gallery.coverImage] : [],
     },
   }
+
+  // Set favicon from photographer branding
+  if (gallery.photographer?.brandFavicon) {
+    metadata.icons = { icon: gallery.photographer.brandFavicon }
+  }
+
+  return metadata
 }
 
 export default async function PublicGalleryPage({ params, searchParams }: PublicGalleryPageProps) {

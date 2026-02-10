@@ -10,7 +10,15 @@ export { updatePhotoOrder } from "./update-photo-order"
 export { setCoverImage } from "./set-cover-image"
 export { registerVisitor } from "./register-visitor"
 export { getGalleryVisitors } from "./get-gallery-visitors"
-export { toggleFavorite } from "./toggle-favorite"
+export { toggleFavorite, updateFavoriteComment } from "./toggle-favorite"
 export { createFavoriteList } from "./create-favorite-list"
 export { submitFavorites } from "./submit-favorites"
 export { getFavoriteLists } from "./get-favorite-lists"
+export {
+  createPhotoSet,
+  updatePhotoSet,
+  deletePhotoSet,
+  reorderPhotoSets,
+  assignPhotosToSet,
+} from "./photo-sets"
+export { getDownloadStats } from "./get-download-stats"

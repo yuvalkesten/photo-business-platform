@@ -1,5 +1,5 @@
 export { generateBookingConfirmationEmail } from "./booking-confirmation"
 export type { BookingConfirmationData } from "./booking-confirmation"
 
-export { generateGalleryReadyEmail } from "./gallery-ready"
-export type { GalleryReadyData } from "./gallery-ready"
+export { generateGalleryReadyEmail, EMAIL_TEMPLATES } from "./gallery-ready"
+export type { GalleryReadyData, EmailTemplate } from "./gallery-ready"

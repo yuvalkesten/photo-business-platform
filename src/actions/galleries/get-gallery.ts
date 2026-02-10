@@ -26,6 +26,14 @@ export async function getGallery(galleryId: string) {
             { uploadedAt: "desc" },
           ],
         },
+        photoSets: {
+          orderBy: { order: "asc" },
+          include: {
+            _count: {
+              select: { photos: true },
+            },
+          },
+        },
       },
     })
 
