@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
+import type { Metadata } from "next"
 import { getPublicGallery } from "@/actions/galleries/get-public-gallery"
-import { GalleryView } from "./GalleryView"
+import { GalleryWithEmailGate } from "./GalleryWithEmailGate"
 import { PasswordForm } from "./PasswordForm"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Camera, Lock, AlertCircle } from "lucide-react"
@@ -8,6 +9,37 @@ import { Camera, Lock, AlertCircle } from "lucide-react"
 interface PublicGalleryPageProps {
   params: Promise<{ token: string }>
   searchParams: Promise<{ password?: string }>
+}
+
+export async function generateMetadata({ params }: PublicGalleryPageProps): Promise<Metadata> {
+  const { token } = await params
+  const result = await getPublicGallery(token)
+
+  if (result.error || !result.gallery) {
+    return { title: "Gallery" }
+  }
+
+  const { gallery } = result
+  const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const url = `${baseUrl}/gallery/${token}`
+
+  return {
+    title: gallery.title,
+    description: gallery.description || `${gallery.photos.length} photos from ${gallery.project.name}`,
+    openGraph: {
+      title: gallery.title,
+      description: gallery.description || `${gallery.photos.length} photos from ${gallery.project.name}`,
+      url,
+      type: "website",
+      images: gallery.coverImage ? [{ url: gallery.coverImage, width: 1200, height: 630 }] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: gallery.title,
+      description: gallery.description || `${gallery.photos.length} photos from ${gallery.project.name}`,
+      images: gallery.coverImage ? [gallery.coverImage] : [],
+    },
+  }
 }
 
 export default async function PublicGalleryPage({ params, searchParams }: PublicGalleryPageProps) {
@@ -73,6 +105,12 @@ export default async function PublicGalleryPage({ params, searchParams }: Public
     )
   }
 
-  // Success - show gallery
-  return <GalleryView gallery={result.gallery} />
+  // Success - show gallery (with email gate if enabled)
+  return (
+    <GalleryWithEmailGate
+      gallery={result.gallery}
+      requireEmail={result.gallery.requireEmail}
+      galleryId={result.gallery.id}
+    />
+  )
 }

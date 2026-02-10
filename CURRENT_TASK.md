@@ -4,6 +4,17 @@
 
 ## Recent Completions
 
+### Gallery Feature Expansion (Feb 10, 2026)
+Six major gallery features implemented:
+1. **Photo Upload Flow** - S3 presigned URL generation, drag-and-drop upload with progress, thumbnail generation via Sharp, upload completion handler creating Photo records
+2. **Photo Management** - Drag-and-drop reordering, multi-select delete with S3 cleanup, set cover image, photo detail overlays
+3. **Social Sharing** - WhatsApp/Facebook/Pinterest/Email/Copy Link share buttons, OpenGraph meta tags for rich previews, Web Share API for mobile
+4. **Client Email Gate** - requireEmail toggle on galleries, GalleryVisitor model, email collection form with cookie persistence, visitor list in admin
+5. **Watermark Application** - Watermark utility using Sharp (center/corner/tiled positioning, configurable opacity), watermark upload in settings, watermarked versions generated on upload, served to public when enabled
+6. **Favorites / Proofing** - Heart toggle on public gallery photos, FavoriteList/FavoritePhoto models, favorites bar with submit flow, photographer email notification, admin view of submitted favorites
+
+DB migrations: gallery_email_gate_and_favorites, watermark_config_and_watermarked_url
+
 ### Invoice Generation (Jan 20, 2026)
 - Invoice model with line items stored as JSON
 - Create invoices from projects with custom line items

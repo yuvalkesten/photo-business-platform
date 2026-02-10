@@ -62,6 +62,7 @@ export function GalleryForm({
       expiresAt: gallery?.expiresAt ? new Date(gallery.expiresAt) : undefined,
       allowDownload: gallery?.allowDownload ?? true,
       watermark: gallery?.watermark || false,
+      requireEmail: gallery?.requireEmail || false,
     },
   })
 
@@ -201,6 +202,20 @@ export function GalleryForm({
             <p className="text-sm text-muted-foreground">
               Set a password to protect this gallery
             </p>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="requireEmail">Require Email</Label>
+              <p className="text-sm text-muted-foreground">
+                Visitors must enter their email before viewing the gallery
+              </p>
+            </div>
+            <Switch
+              id="requireEmail"
+              checked={form.watch("requireEmail")}
+              onCheckedChange={(checked) => form.setValue("requireEmail", checked)}
+            />
           </div>
 
           <div className="space-y-2">

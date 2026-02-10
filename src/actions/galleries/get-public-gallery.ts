@@ -15,6 +15,7 @@ export async function getPublicGallery(shareToken: string, password?: string) {
             filename: true,
             s3Url: true,
             thumbnailUrl: true,
+            watermarkedUrl: true,
             width: true,
             height: true,
           },
@@ -57,6 +58,16 @@ export async function getPublicGallery(shareToken: string, password?: string) {
       }
     }
 
+    // When watermark is enabled, serve watermarked URLs to public viewers
+    const publicPhotos = gallery.photos.map((photo) => ({
+      id: photo.id,
+      filename: photo.filename,
+      s3Url: gallery.watermark && photo.watermarkedUrl ? photo.watermarkedUrl : photo.s3Url,
+      thumbnailUrl: photo.thumbnailUrl,
+      width: photo.width,
+      height: photo.height,
+    }))
+
     // Return gallery without sensitive data
     return {
       success: true,
@@ -67,8 +78,10 @@ export async function getPublicGallery(shareToken: string, password?: string) {
         coverImage: gallery.coverImage,
         allowDownload: gallery.allowDownload,
         watermark: gallery.watermark,
+        requireEmail: gallery.requireEmail,
         expiresAt: gallery.expiresAt,
-        photos: gallery.photos,
+        shareToken: gallery.shareToken,
+        photos: publicPhotos,
         project: gallery.project,
         photographer: {
           name: gallery.user.businessName || gallery.user.name,

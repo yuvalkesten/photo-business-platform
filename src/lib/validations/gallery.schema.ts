@@ -18,6 +18,7 @@ export const gallerySchema = z.object({
   // Settings
   allowDownload: z.boolean().default(true),
   watermark: z.boolean().default(false),
+  requireEmail: z.boolean().default(false),
 })
 
 export const createGallerySchema = gallerySchema

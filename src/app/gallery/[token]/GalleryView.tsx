@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import Image from "next/image"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -17,7 +16,12 @@ import {
   Mail,
   Phone,
   Calendar,
+  Heart,
 } from "lucide-react"
+import { ShareButtons } from "./ShareButtons"
+import { FavoritesBar } from "./FavoritesBar"
+import { createFavoriteList } from "@/actions/galleries/create-favorite-list"
+import { toggleFavorite } from "@/actions/galleries/toggle-favorite"
 
 interface Photo {
   id: string
@@ -36,6 +40,7 @@ interface GalleryData {
   allowDownload: boolean
   watermark: boolean
   expiresAt: Date | null
+  shareToken?: string
   photos: Photo[]
   project: {
     name: string
@@ -54,14 +59,70 @@ interface GalleryViewProps {
 
 export function GalleryView({ gallery }: GalleryViewProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null)
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
+  const [listId, setListId] = useState<string | null>(null)
 
-  const openLightbox = (index: number) => {
-    setSelectedPhoto(index)
+  // Initialize favorites from localStorage
+  useEffect(() => {
+    const storageKey = `favorites_${gallery.id}`
+    const stored = localStorage.getItem(storageKey)
+    if (stored) {
+      try {
+        const data = JSON.parse(stored)
+        setFavoriteIds(new Set(data.photoIds || []))
+        setListId(data.listId || null)
+      } catch {
+        // ignore
+      }
+    }
+  }, [gallery.id])
+
+  // Persist favorites to localStorage
+  const persistFavorites = useCallback(
+    (ids: Set<string>, currentListId: string | null) => {
+      const storageKey = `favorites_${gallery.id}`
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ photoIds: Array.from(ids), listId: currentListId })
+      )
+    },
+    [gallery.id]
+  )
+
+  const handleToggleFavorite = async (photoId: string) => {
+    // Ensure we have a list
+    let currentListId = listId
+    if (!currentListId) {
+      const result = await createFavoriteList(gallery.id)
+      if (result.error || !result.listId) return
+      currentListId = result.listId
+      setListId(currentListId)
+    }
+
+    // Toggle on server
+    const result = await toggleFavorite({
+      galleryId: gallery.id,
+      photoId,
+      listId: currentListId,
+    })
+
+    if (result.error) return
+
+    // Update local state
+    setFavoriteIds((prev) => {
+      const next = new Set(prev)
+      if (result.favorited) {
+        next.add(photoId)
+      } else {
+        next.delete(photoId)
+      }
+      persistFavorites(next, currentListId)
+      return next
+    })
   }
 
-  const closeLightbox = () => {
-    setSelectedPhoto(null)
-  }
+  const openLightbox = (index: number) => setSelectedPhoto(index)
+  const closeLightbox = () => setSelectedPhoto(null)
 
   const goToPrevious = () => {
     if (selectedPhoto === null) return
@@ -95,6 +156,8 @@ export function GalleryView({ gallery }: GalleryViewProps) {
     })
   }
 
+  const favoritePhotos = gallery.photos.filter((p) => favoriteIds.has(p.id))
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -111,12 +174,20 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                 {gallery.project.name} • {gallery.photos.length} photos
               </p>
             </div>
-            {gallery.allowDownload && gallery.photos.length > 0 && (
-              <Button onClick={downloadAll} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Download All
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              <ShareButtons
+                title={gallery.title}
+                url={typeof window !== "undefined" ? window.location.href : ""}
+                description={gallery.description || `${gallery.photos.length} photos from ${gallery.project.name}`}
+                coverImage={gallery.coverImage}
+              />
+              {gallery.allowDownload && gallery.photos.length > 0 && (
+                <Button onClick={downloadAll} variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download All
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -129,13 +200,13 @@ export function GalleryView({ gallery }: GalleryViewProps) {
       )}
 
       {/* Gallery Grid */}
-      <main className="container max-w-7xl mx-auto px-4 py-6">
+      <main className="container max-w-7xl mx-auto px-4 py-6 pb-24">
         {gallery.photos.length === 0 ? (
           <div className="text-center py-20">
             <Camera className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">No photos yet</h2>
             <p className="text-muted-foreground">
-              Photos will appear here once they're uploaded.
+              Photos will appear here once they&apos;re uploaded.
             </p>
           </div>
         ) : (
@@ -152,6 +223,33 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                   className="w-full h-full object-cover transition-transform group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+
+                {/* Favorite heart button */}
+                <div
+                  className={`absolute top-2 left-2 transition-opacity ${
+                    favoriteIds.has(photo.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  }`}
+                >
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleToggleFavorite(photo.id)
+                    }}
+                  >
+                    <Heart
+                      className={`h-4 w-4 ${
+                        favoriteIds.has(photo.id)
+                          ? "text-red-500 fill-red-500"
+                          : "text-foreground"
+                      }`}
+                    />
+                  </Button>
+                </div>
+
+                {/* Download button */}
                 {gallery.allowDownload && (
                   <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
@@ -210,6 +308,15 @@ export function GalleryView({ gallery }: GalleryViewProps) {
         </div>
       </footer>
 
+      {/* Favorites Bar */}
+      {listId && favoritePhotos.length > 0 && (
+        <FavoritesBar
+          favoritePhotos={favoritePhotos}
+          listId={listId}
+          galleryTitle={gallery.title}
+        />
+      )}
+
       {/* Lightbox */}
       <Dialog open={selectedPhoto !== null} onOpenChange={() => closeLightbox()}>
         <DialogContent
@@ -263,17 +370,35 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                   <span className="text-sm">
                     {selectedPhoto + 1} / {gallery.photos.length}
                   </span>
-                  {gallery.allowDownload && (
+                  <div className="flex items-center gap-2">
+                    {/* Favorite button in lightbox */}
                     <Button
                       variant="ghost"
                       size="sm"
                       className="text-white hover:bg-white/20"
-                      onClick={() => downloadPhoto(gallery.photos[selectedPhoto])}
+                      onClick={() => handleToggleFavorite(gallery.photos[selectedPhoto].id)}
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
+                      <Heart
+                        className={`h-4 w-4 mr-2 ${
+                          favoriteIds.has(gallery.photos[selectedPhoto].id)
+                            ? "text-red-500 fill-red-500"
+                            : ""
+                        }`}
+                      />
+                      {favoriteIds.has(gallery.photos[selectedPhoto].id) ? "Favorited" : "Favorite"}
                     </Button>
-                  )}
+                    {gallery.allowDownload && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-white hover:bg-white/20"
+                        onClick={() => downloadPhoto(gallery.photos[selectedPhoto])}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

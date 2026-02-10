@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { requireAuth } from "@/lib/auth/utils"
-import { getGallery } from "@/actions/galleries"
+import { getGallery, getGalleryVisitors, getFavoriteLists } from "@/actions/galleries"
 import { deleteGallery } from "@/actions/galleries/delete-gallery"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,8 +21,13 @@ import {
   Link as LinkIcon,
   Copy,
   ExternalLink,
+  Upload,
+  Mail,
+  Heart,
 } from "lucide-react"
 import { SendGalleryButton } from "@/components/features/galleries/SendGalleryButton"
+import { PhotoUploader } from "@/components/features/galleries/PhotoUploader"
+import { PhotoGrid } from "@/components/features/galleries/PhotoGrid"
 
 interface GalleryDetailPageProps {
   params: Promise<{ id: string }>
@@ -40,6 +45,10 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
   }
 
   const { gallery } = result
+  const visitorsResult = await getGalleryVisitors(id)
+  const visitors = visitorsResult.visitors || []
+  const favoritesResult = await getFavoriteLists(id)
+  const favoriteLists = favoritesResult.lists || []
   // Use NEXTAUTH_URL for production, fall back to NEXT_PUBLIC_APP_URL or localhost
   const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   const shareUrl = `${baseUrl}/gallery/${gallery.shareToken}`
@@ -85,6 +94,12 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
               <Badge variant="outline" className="flex items-center gap-1">
                 <Lock className="h-3 w-3" />
                 Password protected
+              </Badge>
+            )}
+            {gallery.requireEmail && (
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                Email gate
               </Badge>
             )}
           </div>
@@ -217,50 +232,148 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
               )}
             </CardContent>
           </Card>
+
+          {/* Visitors */}
+          {gallery.requireEmail && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Visitors ({visitors.length})
+                </CardTitle>
+                <CardDescription>
+                  Emails collected from gallery visitors
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {visitors.length > 0 ? (
+                  <div className="space-y-2">
+                    {visitors.map((visitor) => (
+                      <div
+                        key={visitor.id}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <div>
+                          <p className="font-medium">{visitor.email}</p>
+                          {visitor.name && (
+                            <p className="text-muted-foreground text-xs">{visitor.name}</p>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(visitor.visitedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No visitors yet. Email gate is enabled.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column - Photos */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Upload Section */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5" />
-                  Photos
-                </CardTitle>
-                <CardDescription>
-                  {gallery.photos?.length || 0} photo(s) in this gallery
-                </CardDescription>
-              </div>
-              <Button size="sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5" />
                 Upload Photos
-              </Button>
+              </CardTitle>
+              <CardDescription>
+                Drag and drop or click to upload photos to this gallery
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {gallery.photos && gallery.photos.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {gallery.photos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="aspect-square rounded-lg overflow-hidden bg-muted"
-                    >
-                      <img
-                        src={photo.thumbnailUrl || photo.s3Url}
-                        alt={photo.filename}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  <ImageIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="mb-4">No photos uploaded yet</p>
-                  <Button>Upload Photos</Button>
-                </div>
-              )}
+              <PhotoUploader galleryId={id} />
             </CardContent>
           </Card>
+
+          {/* Photo Grid */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5" />
+                Photos ({gallery.photos?.length || 0})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PhotoGrid
+                galleryId={id}
+                photos={(gallery.photos || []).map((p) => ({
+                  id: p.id,
+                  filename: p.filename,
+                  s3Url: p.s3Url,
+                  thumbnailUrl: p.thumbnailUrl,
+                  fileSize: p.fileSize,
+                  width: p.width,
+                  height: p.height,
+                  order: p.order,
+                }))}
+                coverImage={gallery.coverImage}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Client Favorites */}
+          {favoriteLists.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="h-5 w-5" />
+                  Client Favorites ({favoriteLists.length})
+                </CardTitle>
+                <CardDescription>
+                  Favorite selections submitted by gallery visitors
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {favoriteLists.map((list) => (
+                  <div key={list.id} className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{list.name || "Anonymous"}</p>
+                        <p className="text-sm text-muted-foreground">{list.email}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant="secondary">
+                          {list.photos.length} photo(s)
+                        </Badge>
+                        {list.submittedAt && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(list.submittedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {list.note && (
+                      <p className="text-sm text-muted-foreground italic">
+                        &ldquo;{list.note}&rdquo;
+                      </p>
+                    )}
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-1">
+                      {list.photos.map((fp) => (
+                        <div
+                          key={fp.id}
+                          className="aspect-square rounded overflow-hidden bg-muted"
+                        >
+                          <img
+                            src={fp.photo.thumbnailUrl || fp.photo.s3Url}
+                            alt={fp.photo.filename}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
