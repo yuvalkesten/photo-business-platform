@@ -34,6 +34,7 @@ import { PhotoSetManager } from "@/components/features/galleries/PhotoSetManager
 import { QRCodeCard } from "@/components/features/galleries/QRCodeCard"
 import { DownloadStats } from "@/components/features/galleries/DownloadStats"
 import { AIAnalysisCard } from "@/components/features/galleries/AIAnalysisCard"
+import { PersonClustersCard } from "@/components/features/galleries/PersonClustersCard"
 
 interface GalleryDetailPageProps {
   params: Promise<{ id: string }>
@@ -321,6 +322,29 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
             galleryId={id}
             photoCount={gallery.photos?.length || 0}
             initialAiSearchEnabled={gallery.aiSearchEnabled ?? false}
+          />
+
+          {/* People / Person Clusters */}
+          <PersonClustersCard
+            personClusters={(gallery.personClusters || []).map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              role: c.role,
+              description: c.description,
+              photoIds: c.photoIds,
+              faceDescription: c.faceDescription,
+            }))}
+            photos={(gallery.photos || []).map((p: any) => ({
+              id: p.id,
+              thumbnailUrl: p.thumbnailUrl,
+              s3Url: p.s3Url,
+              analysis: p.analysis
+                ? {
+                    faceData: p.analysis.faceData,
+                    faceCount: p.analysis.faceCount,
+                  }
+                : null,
+            }))}
           />
 
           {/* Photo Sets */}

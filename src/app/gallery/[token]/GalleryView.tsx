@@ -18,26 +18,19 @@ import {
   Calendar,
   Heart,
   Play,
-  UserSearch,
+  Info,
+  ArrowLeft,
 } from "lucide-react"
 import { ShareButtons } from "./ShareButtons"
 import { FavoritesBar } from "./FavoritesBar"
 import { Slideshow } from "./Slideshow"
 import { DownloadManager } from "./DownloadManager"
 import { GallerySearch } from "./GallerySearch"
+import { PhotoInfoPanel } from "./PhotoInfoPanel"
+import { PeopleRow } from "./PeopleRow"
 import { createFavoriteList } from "@/actions/galleries/create-favorite-list"
 import { toggleFavorite } from "@/actions/galleries/toggle-favorite"
 import { GALLERY_THEMES, GALLERY_FONTS, type GalleryTheme, type GalleryFont } from "@/lib/gallery-themes"
-
-interface FaceDataEntry {
-  faceId: string
-  appearance: string
-  role: string | null
-  expression: string
-  ageRange: string
-  position: { x: number; y: number; width: number; height: number }
-  personClusterId?: string
-}
 
 interface PhotoAnalysisData {
   searchTags: string[]
@@ -67,6 +60,15 @@ interface PhotoSet {
   order: number
 }
 
+interface PersonCluster {
+  id: string
+  name: string | null
+  role: string | null
+  description: string | null
+  photoIds: string[]
+  faceDescription: string | null
+}
+
 interface GalleryData {
   id: string
   title: string
@@ -90,6 +92,7 @@ interface GalleryData {
   // Content
   photos: Photo[]
   photoSets?: PhotoSet[]
+  personClusters?: PersonCluster[]
   project: {
     name: string
     projectType: string
@@ -116,7 +119,14 @@ export function GalleryView({ gallery }: GalleryViewProps) {
   const [showSlideshow, setShowSlideshow] = useState(false)
   const [showDownloadManager, setShowDownloadManager] = useState(false)
   const [searchResults, setSearchResults] = useState<Set<string> | null>(null)
-  const [findingPerson, setFindingPerson] = useState(false)
+  const [showInfoPanel, setShowInfoPanel] = useState(false)
+  const [selectedPerson, setSelectedPerson] = useState<{
+    clusterId: string
+    name: string | null
+    role: string | null
+    photoIds: string[]
+    description: string | null
+  } | null>(null)
 
   const theme = (gallery.theme || "classic") as GalleryTheme
   const themeVars = GALLERY_THEMES[theme]?.vars || GALLERY_THEMES.classic.vars
@@ -195,16 +205,33 @@ export function GalleryView({ gallery }: GalleryViewProps) {
   }
 
   const openLightbox = (index: number) => setSelectedPhoto(index)
-  const closeLightbox = () => setSelectedPhoto(null)
+  const closeLightbox = () => {
+    setSelectedPhoto(null)
+    setShowInfoPanel(false)
+  }
 
   const goToPrevious = () => {
     if (selectedPhoto === null) return
-    setSelectedPhoto(selectedPhoto === 0 ? gallery.photos.length - 1 : selectedPhoto - 1)
+    setShowInfoPanel(false)
+    const photos = selectedPerson
+      ? gallery.photos.filter((p) => selectedPerson.photoIds.includes(p.id))
+      : gallery.photos
+    const currentIdx = photos.findIndex((p) => p.id === gallery.photos[selectedPhoto]?.id)
+    const prevIdx = currentIdx <= 0 ? photos.length - 1 : currentIdx - 1
+    const globalIdx = gallery.photos.findIndex((p) => p.id === photos[prevIdx]?.id)
+    if (globalIdx >= 0) setSelectedPhoto(globalIdx)
   }
 
   const goToNext = () => {
     if (selectedPhoto === null) return
-    setSelectedPhoto(selectedPhoto === gallery.photos.length - 1 ? 0 : selectedPhoto + 1)
+    setShowInfoPanel(false)
+    const photos = selectedPerson
+      ? gallery.photos.filter((p) => selectedPerson.photoIds.includes(p.id))
+      : gallery.photos
+    const currentIdx = photos.findIndex((p) => p.id === gallery.photos[selectedPhoto]?.id)
+    const nextIdx = currentIdx >= photos.length - 1 ? 0 : currentIdx + 1
+    const globalIdx = gallery.photos.findIndex((p) => p.id === photos[nextIdx]?.id)
+    if (globalIdx >= 0) setSelectedPhoto(globalIdx)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -230,28 +257,25 @@ export function GalleryView({ gallery }: GalleryViewProps) {
     ? favoriteIds.size >= gallery.favoriteLimit
     : false
 
-  // Filter photos by search results
-  const displayPhotos = searchResults
-    ? gallery.photos.filter((p) => searchResults.has(p.id))
-    : gallery.photos
+  // Filter photos by person selection or search results
+  const displayPhotos = selectedPerson
+    ? gallery.photos.filter((p) => selectedPerson.photoIds.includes(p.id))
+    : searchResults
+      ? gallery.photos.filter((p) => searchResults.has(p.id))
+      : gallery.photos
 
-  // Handle face search (find person)
-  const handleFindPerson = async (photoId: string, faceId: string) => {
-    setFindingPerson(true)
-    try {
-      const response = await fetch(
-        `/api/galleries/${gallery.id}/find-person?photoId=${photoId}&faceId=${faceId}`
-      )
-      const data = await response.json()
-      if (data.success && data.photoIds) {
-        setSearchResults(new Set(data.photoIds))
-        closeLightbox()
-      }
-    } catch (error) {
-      console.error("Find person failed:", error)
-    } finally {
-      setFindingPerson(false)
-    }
+  // Handle person selection (from info panel or people row)
+  const handleSelectPerson = (person: {
+    clusterId: string
+    name: string | null
+    role: string | null
+    photoIds: string[]
+    description: string | null
+  } | null) => {
+    setSelectedPerson(person)
+    setSearchResults(null)
+    setShowInfoPanel(false)
+    closeLightbox()
   }
 
   // Group photos by sets
@@ -523,15 +547,86 @@ export function GalleryView({ gallery }: GalleryViewProps) {
 
       {/* AI Search */}
       {gallery.aiSearchEnabled && (
-        <div className="container max-w-7xl mx-auto px-4 pb-4">
+        <div className="container max-w-7xl mx-auto px-4 pb-4 space-y-3">
           <GallerySearch
             galleryId={gallery.id}
             photos={gallery.photos}
             totalPhotos={gallery.photos.length}
-            onSearchResults={setSearchResults}
+            onSearchResults={(results) => {
+              setSearchResults(results)
+              if (results) setSelectedPerson(null)
+            }}
+            personClusters={gallery.personClusters || []}
             themeVars={themeVars}
             accentColor={accentColor}
           />
+          {/* People Row */}
+          {(gallery.personClusters?.length ?? 0) > 0 && !selectedPerson && (
+            <PeopleRow
+              personClusters={gallery.personClusters!}
+              photos={gallery.photos}
+              selectedPersonId={null}
+              onSelectPerson={handleSelectPerson}
+              themeVars={themeVars}
+              accentColor={accentColor}
+            />
+          )}
+        </div>
+      )}
+
+      {/* People Row (when AI search is off but clusters exist) */}
+      {!gallery.aiSearchEnabled && (gallery.personClusters?.length ?? 0) > 0 && !selectedPerson && (
+        <div className="container max-w-7xl mx-auto px-4 pb-4">
+          <PeopleRow
+            personClusters={gallery.personClusters!}
+            photos={gallery.photos}
+            selectedPersonId={null}
+            onSelectPerson={handleSelectPerson}
+            themeVars={themeVars}
+            accentColor={accentColor}
+          />
+        </div>
+      )}
+
+      {/* Person View Header */}
+      {selectedPerson && (
+        <div
+          className="container max-w-7xl mx-auto px-4 pb-4"
+        >
+          <div
+            className="flex items-center gap-3 p-3 rounded-lg"
+            style={{
+              backgroundColor: themeVars["--gallery-card-bg"] || themeVars["--gallery-bg"],
+              borderColor: themeVars["--gallery-border"],
+              border: "1px solid",
+            }}
+          >
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => setSelectedPerson(null)}
+              style={{ color: themeVars["--gallery-text"] }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">
+                {selectedPerson.name || selectedPerson.role || "Unknown Person"}
+              </p>
+              <p className="text-sm" style={{ color: themeVars["--gallery-muted"] }}>
+                {displayPhotos.length} photo{displayPhotos.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedPerson(null)}
+              style={{ color: accentColor }}
+            >
+              Back to all photos
+            </Button>
+          </div>
         </div>
       )}
 
@@ -541,15 +636,15 @@ export function GalleryView({ gallery }: GalleryViewProps) {
           <div className="text-center py-20">
             <Camera className="h-16 w-16 mx-auto mb-4" style={{ color: themeVars["--gallery-muted"] }} />
             <h2 className="text-xl font-semibold mb-2">
-              {searchResults ? "No matching photos" : "No photos yet"}
+              {searchResults || selectedPerson ? "No matching photos" : "No photos yet"}
             </h2>
             <p style={{ color: themeVars["--gallery-muted"] }}>
-              {searchResults
+              {searchResults || selectedPerson
                 ? "Try a different search term."
                 : "Photos will appear here once they're uploaded."}
             </p>
           </div>
-        ) : hasPhotoSets && !searchResults ? (
+        ) : hasPhotoSets && !searchResults && !selectedPerson ? (
           // Render by sets
           <div className="space-y-12">
             {gallery.photoSets!.map((set) => {
@@ -706,6 +801,18 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                 className="max-w-full max-h-full object-contain"
               />
 
+              {/* Photo Info Panel */}
+              {showInfoPanel && (
+                <PhotoInfoPanel
+                  photo={gallery.photos[selectedPhoto]}
+                  personClusters={gallery.personClusters || []}
+                  onSelectPerson={handleSelectPerson}
+                  onClose={() => setShowInfoPanel(false)}
+                  themeVars={themeVars}
+                  accentColor={accentColor}
+                />
+              )}
+
               {/* Bottom bar */}
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
                 <div className="flex items-center justify-between text-white">
@@ -713,25 +820,16 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                     {selectedPhoto + 1} / {gallery.photos.length}
                   </span>
                   <div className="flex items-center gap-2">
-                    {/* Find Person button in lightbox */}
-                    {gallery.photos[selectedPhoto].analysis?.faceCount &&
-                      gallery.photos[selectedPhoto].analysis!.faceCount > 0 &&
-                      gallery.photos[selectedPhoto].analysis!.faceData && (
+                    {/* Info button */}
+                    {gallery.photos[selectedPhoto].analysis && (
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-white hover:bg-white/20"
-                        disabled={findingPerson}
-                        onClick={() => {
-                          const photo = gallery.photos[selectedPhoto]
-                          const faces = photo.analysis?.faceData as FaceDataEntry[] | null
-                          if (faces && faces.length > 0) {
-                            handleFindPerson(photo.id, faces[0].faceId)
-                          }
-                        }}
+                        onClick={() => setShowInfoPanel(!showInfoPanel)}
                       >
-                        <UserSearch className="h-4 w-4 mr-2" />
-                        {findingPerson ? "Finding..." : "Find Person"}
+                        <Info className="h-4 w-4 mr-2" />
+                        Info
                       </Button>
                     )}
                     {/* Favorite button in lightbox */}

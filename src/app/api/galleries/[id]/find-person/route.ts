@@ -50,12 +50,14 @@ export async function GET(
     if (targetFace.personClusterId) {
       const cluster = await prisma.personCluster.findUnique({
         where: { id: targetFace.personClusterId },
-        select: { photoIds: true, description: true, role: true },
+        select: { id: true, name: true, photoIds: true, description: true, role: true },
       })
 
       if (cluster) {
         return NextResponse.json({
           success: true,
+          clusterId: cluster.id,
+          personName: cluster.name,
           photoIds: cluster.photoIds,
           personDescription: cluster.description,
           personRole: cluster.role,

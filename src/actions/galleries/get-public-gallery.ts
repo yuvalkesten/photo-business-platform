@@ -59,6 +59,16 @@ export async function getPublicGallery(shareToken: string, password?: string) {
             brandAccentColor: true,
           },
         },
+        personClusters: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            description: true,
+            photoIds: true,
+            faceDescription: true,
+          },
+        },
       },
     })
 
@@ -130,6 +140,7 @@ export async function getPublicGallery(shareToken: string, password?: string) {
         // Content
         photos: publicPhotos,
         photoSets: gallery.photoSets,
+        personClusters: gallery.personClusters,
         project: gallery.project,
         photographer: {
           name: gallery.user.businessName || gallery.user.name,

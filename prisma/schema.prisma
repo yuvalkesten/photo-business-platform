@@ -632,6 +632,7 @@ model PhotoAnalysis {
 model PersonCluster {
   id              String   @id @default(cuid())
   galleryId       String
+  name            String?
   description     String?  @db.Text
   role            String?
   photoIds        String[]

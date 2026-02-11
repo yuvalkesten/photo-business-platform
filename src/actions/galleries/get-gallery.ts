@@ -25,6 +25,14 @@ export async function getGallery(galleryId: string) {
             { order: "asc" },
             { uploadedAt: "desc" },
           ],
+          include: {
+            analysis: {
+              select: {
+                faceData: true,
+                faceCount: true,
+              },
+            },
+          },
         },
         photoSets: {
           orderBy: { order: "asc" },
@@ -32,6 +40,16 @@ export async function getGallery(galleryId: string) {
             _count: {
               select: { photos: true },
             },
+          },
+        },
+        personClusters: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            description: true,
+            photoIds: true,
+            faceDescription: true,
           },
         },
       },

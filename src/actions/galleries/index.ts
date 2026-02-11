@@ -22,3 +22,4 @@ export {
   assignPhotosToSet,
 } from "./photo-sets"
 export { getDownloadStats } from "./get-download-stats"
+export { renamePersonCluster } from "./rename-person-cluster"

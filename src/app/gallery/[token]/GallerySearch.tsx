@@ -14,11 +14,19 @@ interface PhotoWithAnalysis {
   } | null
 }
 
+interface PersonCluster {
+  id: string
+  name: string | null
+  role: string | null
+  photoIds: string[]
+}
+
 interface GallerySearchProps {
   galleryId: string
   photos: PhotoWithAnalysis[]
   totalPhotos: number
   onSearchResults: (photoIds: Set<string> | null) => void
+  personClusters?: PersonCluster[]
   themeVars: Record<string, string>
   accentColor: string
 }
@@ -28,6 +36,7 @@ export function GallerySearch({
   photos,
   totalPhotos,
   onSearchResults,
+  personClusters = [],
   themeVars,
   accentColor,
 }: GallerySearchProps) {
@@ -46,7 +55,22 @@ export function GallerySearch({
         return
       }
 
-      const words = searchQuery.trim().toLowerCase().split(/\s+/)
+      const queryLower = searchQuery.trim().toLowerCase()
+      const words = queryLower.split(/\s+/)
+
+      // Check if query matches a person cluster name
+      if (personClusters.length > 0) {
+        const matchingCluster = personClusters.find(
+          (c) => c.name && c.name.toLowerCase().includes(queryLower)
+        )
+        if (matchingCluster) {
+          const ids = new Set(matchingCluster.photoIds)
+          onSearchResults(ids)
+          setResultCount(ids.size)
+          setSearchMode("instant")
+          return
+        }
+      }
 
       // Instant mode: client-side tag matching for simple queries
       if (words.length <= 2) {
@@ -88,7 +112,7 @@ export function GallerySearch({
         setIsSearching(false)
       }
     },
-    [galleryId, photos, onSearchResults]
+    [galleryId, photos, personClusters, onSearchResults]
   )
 
   const handleInputChange = useCallback(
