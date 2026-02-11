@@ -1,7 +1,7 @@
 "use client"
 
-import { useRef, useEffect } from "react"
-import { X } from "lucide-react"
+import { useRef, useEffect, useState } from "react"
+import { X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FaceThumbnail } from "@/components/features/galleries/FaceThumbnail"
@@ -37,6 +37,7 @@ interface PhotoInfoPanelProps {
       faceCount: number
     } | null
   }
+  galleryId: string
   personClusters: PersonCluster[]
   onSelectPerson: (cluster: {
     clusterId: string
@@ -52,6 +53,7 @@ interface PhotoInfoPanelProps {
 
 export function PhotoInfoPanel({
   photo,
+  galleryId,
   personClusters,
   onSelectPerson,
   onClose,
@@ -59,6 +61,7 @@ export function PhotoInfoPanel({
   accentColor,
 }: PhotoInfoPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const [loadingFaceId, setLoadingFaceId] = useState<string | null>(null)
 
   const faces = (photo.analysis?.faceData as FaceDataEntry[] | null) || []
   const description = photo.analysis?.description
@@ -94,8 +97,10 @@ export function PhotoInfoPanel({
     return "Unknown"
   }
 
-  const handleFaceClick = (face: FaceDataEntry) => {
+  const handleFaceClick = async (face: FaceDataEntry) => {
     const cluster = getClusterForFace(face)
+
+    // If face has a known cluster, navigate directly
     if (cluster) {
       onSelectPerson({
         clusterId: cluster.id,
@@ -104,6 +109,29 @@ export function PhotoInfoPanel({
         photoIds: cluster.photoIds,
         description: cluster.description,
       })
+      return
+    }
+
+    // Fallback: use find-person API for unclustered faces
+    setLoadingFaceId(face.faceId)
+    try {
+      const response = await fetch(
+        `/api/galleries/${galleryId}/find-person?photoId=${photo.id}&faceId=${face.faceId}`
+      )
+      const data = await response.json()
+      if (data.success && data.photoIds) {
+        onSelectPerson({
+          clusterId: data.clusterId || face.faceId,
+          name: data.personName || null,
+          role: data.personRole || face.role,
+          photoIds: data.photoIds,
+          description: data.personDescription || null,
+        })
+      }
+    } catch (error) {
+      console.error("Find person failed:", error)
+    } finally {
+      setLoadingFaceId(null)
     }
   }
 
@@ -138,23 +166,26 @@ export function PhotoInfoPanel({
               People in this photo
             </h3>
             <div className="flex gap-4 overflow-x-auto pb-2">
-              {faces.map((face) => {
-                const cluster = getClusterForFace(face)
-                const hasCluster = !!cluster
-
-                return (
+              {faces.map((face) => (
+                <div key={face.faceId} className="relative">
                   <FaceThumbnail
-                    key={face.faceId}
                     photoUrl={photoUrl}
                     position={face.position}
                     size={56}
                     name={getFaceLabel(face)}
-                    onClick={hasCluster ? () => handleFaceClick(face) : undefined}
-                    className={hasCluster ? "hover:opacity-80 transition-opacity" : "opacity-70"}
+                    onClick={() => handleFaceClick(face)}
+                    className="hover:opacity-80 transition-opacity"
                     accentColor={accentColor}
                   />
-                )
-              })}
+                  {loadingFaceId === face.faceId && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="rounded-full bg-black/50 p-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}

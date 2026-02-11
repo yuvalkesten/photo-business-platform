@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { User } from "lucide-react"
 
 interface FaceThumbnailProps {
@@ -24,140 +24,99 @@ export function FaceThumbnail({
   highlight = false,
   accentColor,
 }: FaceThumbnailProps) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
+  const [imgDims, setImgDims] = useState<{ w: number; h: number } | null>(null)
   const [loading, setLoading] = useState(true)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
-    if (!photoUrl || !position) return
+    if (!photoUrl || !position) {
+      setLoading(false)
+      setError(true)
+      return
+    }
 
     const img = new Image()
-    img.crossOrigin = "anonymous"
-
     img.onload = () => {
-      try {
-        const canvas = canvasRef.current
-        if (!canvas) return
-
-        // Calculate crop region with 20% padding
-        const padding = 0.2
-        const cx = position.x * img.naturalWidth
-        const cy = position.y * img.naturalHeight
-        const cw = position.width * img.naturalWidth
-        const ch = position.height * img.naturalHeight
-
-        const padX = cw * padding
-        const padY = ch * padding
-
-        const sx = Math.max(0, cx - padX)
-        const sy = Math.max(0, cy - padY)
-        const sw = Math.min(img.naturalWidth - sx, cw + padX * 2)
-        const sh = Math.min(img.naturalHeight - sy, ch + padY * 2)
-
-        // Make square crop from the center
-        const cropSize = Math.max(sw, sh)
-        const finalSx = Math.max(0, sx - (cropSize - sw) / 2)
-        const finalSy = Math.max(0, sy - (cropSize - sh) / 2)
-        const finalSize = Math.min(
-          cropSize,
-          img.naturalWidth - finalSx,
-          img.naturalHeight - finalSy
-        )
-
-        const outputSize = size * 2 // 2x for retina
-        canvas.width = outputSize
-        canvas.height = outputSize
-
-        const ctx = canvas.getContext("2d")
-        if (!ctx) {
-          setFailed(true)
-          setLoading(false)
-          return
-        }
-
-        // Draw circular clip
-        ctx.beginPath()
-        ctx.arc(outputSize / 2, outputSize / 2, outputSize / 2, 0, Math.PI * 2)
-        ctx.clip()
-
-        ctx.drawImage(
-          img,
-          finalSx,
-          finalSy,
-          finalSize,
-          finalSize,
-          0,
-          0,
-          outputSize,
-          outputSize
-        )
-
-        setDataUrl(canvas.toDataURL("image/jpeg", 0.8))
-        setLoading(false)
-      } catch {
-        setFailed(true)
-        setLoading(false)
-      }
-    }
-
-    img.onerror = () => {
-      setFailed(true)
+      setImgDims({ w: img.naturalWidth, h: img.naturalHeight })
       setLoading(false)
     }
-
+    img.onerror = () => {
+      setError(true)
+      setLoading(false)
+    }
     img.src = photoUrl
-  }, [photoUrl, position, size])
+  }, [photoUrl, position])
 
   const ringStyle = highlight && accentColor
     ? { boxShadow: `0 0 0 2px ${accentColor}` }
     : {}
 
-  const wrapperClasses = `inline-flex flex-col items-center gap-1 ${
-    onClick ? "cursor-pointer" : ""
-  } ${className}`
+  // Calculate CSS positioning to zoom into the face
+  let imgStyle: React.CSSProperties = {}
+  if (imgDims) {
+    const padding = 1.4 // 20% padding on each side
+    const facePixW = position.width * imgDims.w * padding
+    const facePixH = position.height * imgDims.h * padding
+    const facePixSize = Math.max(facePixW, facePixH, 1)
+    const scale = size / facePixSize
+
+    const faceCx = (position.x + position.width / 2) * imgDims.w
+    const faceCy = (position.y + position.height / 2) * imgDims.h
+
+    imgStyle = {
+      position: "absolute",
+      width: imgDims.w * scale,
+      height: imgDims.h * scale,
+      left: -(faceCx * scale - size / 2),
+      top: -(faceCy * scale - size / 2),
+      maxWidth: "none",
+    }
+  }
 
   return (
-    <div className={wrapperClasses} onClick={onClick}>
-      <canvas ref={canvasRef} className="hidden" />
-
-      {loading ? (
-        <div
-          className="rounded-full bg-muted flex items-center justify-center"
-          style={{ width: size, height: size, ...ringStyle }}
-        >
-          <User className="h-1/2 w-1/2 text-muted-foreground" />
-        </div>
-      ) : failed || !dataUrl ? (
-        /* CSS fallback when canvas fails (CORS) */
-        <div
-          className="rounded-full overflow-hidden"
-          style={{ width: size, height: size, ...ringStyle }}
-        >
+    <div
+      className={`inline-flex flex-col items-center gap-1 shrink-0 ${
+        onClick ? "cursor-pointer" : ""
+      } ${className}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                onClick()
+              }
+            }
+          : undefined
+      }
+    >
+      <div
+        className="rounded-full overflow-hidden relative bg-muted"
+        style={{ width: size, height: size, ...ringStyle }}
+      >
+        {loading ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <User className="h-1/2 w-1/2 text-muted-foreground" />
+          </div>
+        ) : error || !imgDims ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <User className="h-1/2 w-1/2 text-muted-foreground" />
+          </div>
+        ) : (
           <img
             src={photoUrl}
             alt={name || "Person"}
-            className="w-full h-full object-cover"
-            style={{
-              objectPosition: `${position.x * 100 + position.width * 50}% ${
-                position.y * 100 + position.height * 50
-              }%`,
-              transform: `scale(${1 / Math.min(position.width, position.height)})`,
-            }}
+            style={imgStyle}
+            draggable={false}
           />
-        </div>
-      ) : (
-        <img
-          src={dataUrl}
-          alt={name || "Person"}
-          className="rounded-full object-cover"
-          style={{ width: size, height: size, ...ringStyle }}
-        />
-      )}
+        )}
+      </div>
 
       {name !== undefined && (
         <span
-          className="text-xs truncate max-w-[60px] text-center"
+          className="text-xs truncate max-w-[60px] text-center leading-tight"
           title={name || undefined}
         >
           {name || ""}

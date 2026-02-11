@@ -805,6 +805,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
               {showInfoPanel && (
                 <PhotoInfoPanel
                   photo={gallery.photos[selectedPhoto]}
+                  galleryId={gallery.id}
                   personClusters={gallery.personClusters || []}
                   onSelectPerson={handleSelectPerson}
                   onClose={() => setShowInfoPanel(false)}
