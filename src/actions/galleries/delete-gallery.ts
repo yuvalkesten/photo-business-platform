@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { requireAuth } from "@/lib/auth/utils"
 import { prisma } from "@/lib/db"
+import { deleteCollection } from "@/lib/aws/rekognition"
 
 export async function deleteGallery(galleryId: string) {
   try {
@@ -36,6 +37,15 @@ export async function deleteGallery(galleryId: string) {
     if (existingGallery._count.photos > 0) {
       return {
         error: `Cannot delete gallery with ${existingGallery._count.photos} photo(s). Please delete the photos first.`,
+      }
+    }
+
+    // Clean up Rekognition collection if it exists
+    if (existingGallery.rekognitionCollectionId) {
+      try {
+        await deleteCollection(existingGallery.rekognitionCollectionId)
+      } catch (error) {
+        console.warn("Failed to delete Rekognition collection:", error)
       }
     }
 

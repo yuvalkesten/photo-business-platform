@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { analyzeGallery, resetStaleProcessingRecords } from "@/lib/ai/analyze-gallery"
+import { deleteCollection } from "@/lib/aws/rekognition"
 
 const STALE_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
 const RETRYABLE_ERROR_PREFIXES = ["[TIMEOUT]", "[RATE_LIMIT]", "[API_ERROR]"]
@@ -26,7 +27,7 @@ export async function POST(
     // Verify gallery ownership
     const gallery = await prisma.gallery.findUnique({
       where: { id },
-      select: { userId: true, analysisProgress: true },
+      select: { userId: true, analysisProgress: true, rekognitionCollectionId: true },
     })
 
     if (!gallery || gallery.userId !== session.user.id) {
@@ -82,13 +83,26 @@ export async function POST(
       })
     }
 
-    // If reanalyze, reset all analyses
+    // If reanalyze, reset all analyses and Rekognition collection
     if (body.reanalyze) {
+      // Delete Rekognition collection (will be recreated during analysis)
+      if (gallery.rekognitionCollectionId) {
+        try {
+          await deleteCollection(gallery.rekognitionCollectionId)
+        } catch (error) {
+          console.warn("Failed to delete Rekognition collection:", error)
+        }
+      }
+
       await prisma.photoAnalysis.deleteMany({ where: { galleryId: id } })
       await prisma.personCluster.deleteMany({ where: { galleryId: id } })
       await prisma.gallery.update({
         where: { id },
-        data: { analysisProgress: 0, aiSearchEnabled: false },
+        data: {
+          analysisProgress: 0,
+          aiSearchEnabled: false,
+          rekognitionCollectionId: null,
+        },
       })
     }
 

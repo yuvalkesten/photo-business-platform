@@ -1,6 +1,20 @@
 # Current Task
 
-## Status: PAUSED
+## Status: COMPLETED
+
+## Recent: Hybrid CV + LLM Face Detection (AWS Rekognition)
+Replaced pure-LLM face detection/clustering with AWS Rekognition CV backbone:
+- **Rekognition DetectFaces** for precise bounding boxes (confidence-filtered ≥70%)
+- **Rekognition IndexFaces/SearchFaces** for visual similarity clustering (no more LLM text matching)
+- **Gemini Vision** retained for scene understanding (descriptions, tags, roles, mood)
+- 3-stage pipeline: CV Detection → LLM Annotation → Face Indexing
+- Graceful degradation: if Rekognition unavailable, falls back to LLM-only
+- Gallery lifecycle: collection create on analyze, cleanup on re-analyze/delete
+
+New files: `src/lib/aws/rekognition.ts`, `src/lib/ai/detect-faces.ts`, `src/lib/ai/index-faces.ts`
+Modified: `analyze-photo.ts`, `photo-analysis-prompt.ts`, `person-clustering.ts`, `analyze-gallery.ts`, `find-person/route.ts`, `analyze/route.ts`, `delete-gallery.ts`
+DB migration: `add_rekognition_fields` (Gallery.rekognitionCollectionId, PersonCluster.rekognitionFaceIds/representativeFaceId)
+New dependency: `@aws-sdk/client-rekognition`
 
 ## Next Up: Gallery Enhancement Features
 Based on competitive analysis (Unscripted + Pixieset), two gallery-focused features to close gaps:

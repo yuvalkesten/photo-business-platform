@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db"
 import { analyzePhoto } from "./analyze-photo"
 import { clusterPersons } from "./person-clustering"
+import { ensureCollection } from "./index-faces"
 
 const BATCH_SIZE = 3
 const BATCH_DELAY_MS = 2000
@@ -19,6 +20,16 @@ export async function analyzeGallery(galleryId: string): Promise<void> {
     event: "gallery_analysis_start",
     galleryId,
   }))
+
+  // Step 0: Ensure Rekognition collection exists
+  let collectionId: string | undefined
+  try {
+    collectionId = await ensureCollection(galleryId)
+  } catch (error) {
+    // Non-fatal: analysis will proceed without face indexing
+    console.warn(`Failed to create Rekognition collection for ${galleryId}:`,
+      error instanceof Error ? error.message : error)
+  }
 
   // Step 1: Clean up stale PROCESSING records (orphans from crashed runs)
   await resetStaleProcessingRecords(galleryId)
@@ -83,7 +94,7 @@ export async function analyzeGallery(galleryId: string): Promise<void> {
     const batchStartTime = Date.now()
 
     await Promise.allSettled(
-      batch.map((photo) => analyzePhoto(photo.id, galleryId))
+      batch.map((photo) => analyzePhoto(photo.id, galleryId, collectionId))
     )
 
     console.log(JSON.stringify({
@@ -103,7 +114,7 @@ export async function analyzeGallery(galleryId: string): Promise<void> {
   }
 
   // Step 3: Automatic retry loop for transient failures
-  await retryFailedPhotos(galleryId, totalPhotos)
+  await retryFailedPhotos(galleryId, totalPhotos, collectionId)
 
   // Run person clustering
   try {
@@ -177,7 +188,11 @@ export async function resetStaleProcessingRecords(galleryId: string): Promise<nu
   return result.count
 }
 
-async function retryFailedPhotos(galleryId: string, totalPhotos: number): Promise<void> {
+async function retryFailedPhotos(
+  galleryId: string,
+  totalPhotos: number,
+  collectionId?: string
+): Promise<void> {
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     // Find retryable failures
     const retryable = await prisma.photoAnalysis.findMany({
@@ -225,7 +240,7 @@ async function retryFailedPhotos(galleryId: string, totalPhotos: number): Promis
       const batch = retryable.slice(i, i + BATCH_SIZE)
 
       await Promise.allSettled(
-        batch.map((r) => analyzePhoto(r.photoId, galleryId))
+        batch.map((r) => analyzePhoto(r.photoId, galleryId, collectionId))
       )
 
       await updateProgressFromDb(galleryId, totalPhotos)

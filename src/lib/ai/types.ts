@@ -6,6 +6,16 @@ export interface PersonFace {
   ageRange: string
   position: { x: number; y: number; width: number; height: number }
   personClusterId?: string
+  confidence?: number
+  rekognitionFaceId?: string
+  detectionSource?: "rekognition" | "llm" | "legacy"
+}
+
+export interface CVDetectedFace {
+  boundingBox: { x: number; y: number; width: number; height: number }
+  confidence: number
+  ageRange?: { low: number; high: number }
+  emotions?: Array<{ type: string; confidence: number }>
 }
 
 export interface PhotoAnalysisResult {
