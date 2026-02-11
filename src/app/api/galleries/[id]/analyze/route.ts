@@ -150,8 +150,22 @@ export async function GET(
       }),
     ])
 
-    // Detect stall: PROCESSING records exist AND last activity was >5 minutes ago
+    // Compute progress live from DB stats (not stale stored value)
     const processingCount = stats.find((s) => s.status === "PROCESSING")?._count || 0
+    const pendingCount = stats.find((s) => s.status === "PENDING")?._count || 0
+    const completedCount = stats.find((s) => s.status === "COMPLETED")?._count || 0
+    const failedCount = stats.find((s) => s.status === "FAILED")?._count || 0
+    const doneCount = completedCount + failedCount
+    const hasActiveWork = processingCount > 0 || pendingCount > 0
+
+    // Progress: if no active work, 100%. Otherwise compute from done/total, capped at 99%.
+    const liveProgress = totalPhotos === 0
+      ? 0
+      : hasActiveWork
+        ? Math.min(Math.round((doneCount / totalPhotos) * 100), 99)
+        : 100
+
+    // Detect stall: PROCESSING records exist AND last activity was >5 minutes ago
     const lastActivity = lastActivityResult?.updatedAt || null
     const isStalled = processingCount > 0 &&
       lastActivity !== null &&
@@ -159,7 +173,7 @@ export async function GET(
 
     const responseData: Record<string, unknown> = {
       success: true,
-      progress: gallery.analysisProgress,
+      progress: liveProgress,
       aiSearchEnabled: gallery.aiSearchEnabled,
       totalPhotos,
       isStalled,
