@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { getS3Url, uploadBufferToS3 } from "@/lib/s3"
 import sharp from "sharp"
 import { applyWatermark, type WatermarkPosition } from "@/lib/watermark"
+import { analyzeGallery } from "@/lib/ai/analyze-gallery"
 
 const THUMBNAIL_WIDTH = 600
 const THUMBNAIL_QUALITY = 80
@@ -158,6 +159,33 @@ export async function POST(request: NextRequest) {
         where: { id: galleryId },
         data: { coverImage: createdPhotos[0].thumbnailUrl || createdPhotos[0].s3Url },
       })
+    }
+
+    // Auto-trigger AI analysis (throttled to once per hour)
+    try {
+      const galleryForAnalysis = await prisma.gallery.findUnique({
+        where: { id: galleryId },
+        select: { lastAnalysisTriggeredAt: true },
+      })
+
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+      const shouldTrigger =
+        !galleryForAnalysis?.lastAnalysisTriggeredAt ||
+        galleryForAnalysis.lastAnalysisTriggeredAt < oneHourAgo
+
+      if (shouldTrigger) {
+        await prisma.gallery.update({
+          where: { id: galleryId },
+          data: { lastAnalysisTriggeredAt: new Date() },
+        })
+
+        // Fire-and-forget
+        analyzeGallery(galleryId).catch((err) => {
+          console.error(`Auto-analysis failed for gallery ${galleryId}:`, err)
+        })
+      }
+    } catch (err) {
+      console.error("Failed to trigger auto-analysis:", err)
     }
 
     return NextResponse.json({

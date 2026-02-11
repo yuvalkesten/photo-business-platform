@@ -33,6 +33,7 @@ import { PhotoGrid } from "@/components/features/galleries/PhotoGrid"
 import { PhotoSetManager } from "@/components/features/galleries/PhotoSetManager"
 import { QRCodeCard } from "@/components/features/galleries/QRCodeCard"
 import { DownloadStats } from "@/components/features/galleries/DownloadStats"
+import { AIAnalysisCard } from "@/components/features/galleries/AIAnalysisCard"
 
 interface GalleryDetailPageProps {
   params: Promise<{ id: string }>
@@ -314,6 +315,13 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
               <PhotoUploader galleryId={id} />
             </CardContent>
           </Card>
+
+          {/* AI Search Analysis */}
+          <AIAnalysisCard
+            galleryId={id}
+            photoCount={gallery.photos?.length || 0}
+            initialAiSearchEnabled={gallery.aiSearchEnabled ?? false}
+          />
 
           {/* Photo Sets */}
           <Card>

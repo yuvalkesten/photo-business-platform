@@ -20,6 +20,15 @@ export async function getPublicGallery(shareToken: string, password?: string) {
             width: true,
             height: true,
             setId: true,
+            analysis: {
+              select: {
+                searchTags: true,
+                description: true,
+                status: true,
+                faceData: true,
+                faceCount: true,
+              },
+            },
           },
         },
         photoSets: {
@@ -84,6 +93,14 @@ export async function getPublicGallery(shareToken: string, password?: string) {
       width: photo.width,
       height: photo.height,
       setId: photo.setId,
+      analysis: photo.analysis
+        ? {
+            searchTags: photo.analysis.searchTags,
+            description: photo.analysis.description,
+            faceData: photo.analysis.faceData,
+            faceCount: photo.analysis.faceCount,
+          }
+        : null,
     }))
 
     // Return gallery without sensitive data
@@ -108,6 +125,8 @@ export async function getPublicGallery(shareToken: string, password?: string) {
         // Download options
         downloadResolution: gallery.downloadResolution,
         favoriteLimit: gallery.favoriteLimit,
+        // AI Search
+        aiSearchEnabled: gallery.aiSearchEnabled,
         // Content
         photos: publicPhotos,
         photoSets: gallery.photoSets,

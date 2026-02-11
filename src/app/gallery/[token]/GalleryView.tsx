@@ -18,14 +18,34 @@ import {
   Calendar,
   Heart,
   Play,
+  UserSearch,
 } from "lucide-react"
 import { ShareButtons } from "./ShareButtons"
 import { FavoritesBar } from "./FavoritesBar"
 import { Slideshow } from "./Slideshow"
 import { DownloadManager } from "./DownloadManager"
+import { GallerySearch } from "./GallerySearch"
 import { createFavoriteList } from "@/actions/galleries/create-favorite-list"
 import { toggleFavorite } from "@/actions/galleries/toggle-favorite"
 import { GALLERY_THEMES, GALLERY_FONTS, type GalleryTheme, type GalleryFont } from "@/lib/gallery-themes"
+
+interface FaceDataEntry {
+  faceId: string
+  appearance: string
+  role: string | null
+  expression: string
+  ageRange: string
+  position: { x: number; y: number; width: number; height: number }
+  personClusterId?: string
+}
+
+interface PhotoAnalysisData {
+  searchTags: string[]
+  description: string | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  faceData: any
+  faceCount: number
+}
 
 interface Photo {
   id: string
@@ -36,6 +56,7 @@ interface Photo {
   width: number | null
   height: number | null
   setId?: string | null
+  analysis?: PhotoAnalysisData | null
 }
 
 interface PhotoSet {
@@ -64,6 +85,8 @@ interface GalleryData {
   // Download options
   downloadResolution?: string
   favoriteLimit?: number | null
+  // AI Search
+  aiSearchEnabled?: boolean
   // Content
   photos: Photo[]
   photoSets?: PhotoSet[]
@@ -92,6 +115,8 @@ export function GalleryView({ gallery }: GalleryViewProps) {
   const [listId, setListId] = useState<string | null>(null)
   const [showSlideshow, setShowSlideshow] = useState(false)
   const [showDownloadManager, setShowDownloadManager] = useState(false)
+  const [searchResults, setSearchResults] = useState<Set<string> | null>(null)
+  const [findingPerson, setFindingPerson] = useState(false)
 
   const theme = (gallery.theme || "classic") as GalleryTheme
   const themeVars = GALLERY_THEMES[theme]?.vars || GALLERY_THEMES.classic.vars
@@ -205,6 +230,30 @@ export function GalleryView({ gallery }: GalleryViewProps) {
     ? favoriteIds.size >= gallery.favoriteLimit
     : false
 
+  // Filter photos by search results
+  const displayPhotos = searchResults
+    ? gallery.photos.filter((p) => searchResults.has(p.id))
+    : gallery.photos
+
+  // Handle face search (find person)
+  const handleFindPerson = async (photoId: string, faceId: string) => {
+    setFindingPerson(true)
+    try {
+      const response = await fetch(
+        `/api/galleries/${gallery.id}/find-person?photoId=${photoId}&faceId=${faceId}`
+      )
+      const data = await response.json()
+      if (data.success && data.photoIds) {
+        setSearchResults(new Set(data.photoIds))
+        closeLightbox()
+      }
+    } catch (error) {
+      console.error("Find person failed:", error)
+    } finally {
+      setFindingPerson(false)
+    }
+  }
+
   // Group photos by sets
   const photosBySet = new Map<string | null, Photo[]>()
   if (gallery.photoSets && gallery.photoSets.length > 0) {
@@ -212,7 +261,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
       photosBySet.set(set.id, [])
     }
     photosBySet.set(null, []) // uncategorized
-    for (const photo of gallery.photos) {
+    for (const photo of displayPhotos) {
       const bucket = photosBySet.get(photo.setId ?? null) || photosBySet.get(null)!
       bucket.push(photo)
     }
@@ -472,17 +521,35 @@ export function GalleryView({ gallery }: GalleryViewProps) {
         </div>
       )}
 
+      {/* AI Search */}
+      {gallery.aiSearchEnabled && (
+        <div className="container max-w-7xl mx-auto px-4 pb-4">
+          <GallerySearch
+            galleryId={gallery.id}
+            photos={gallery.photos}
+            totalPhotos={gallery.photos.length}
+            onSearchResults={setSearchResults}
+            themeVars={themeVars}
+            accentColor={accentColor}
+          />
+        </div>
+      )}
+
       {/* Gallery Grid */}
       <main className="container max-w-7xl mx-auto px-4 py-6 pb-24">
-        {gallery.photos.length === 0 ? (
+        {displayPhotos.length === 0 ? (
           <div className="text-center py-20">
             <Camera className="h-16 w-16 mx-auto mb-4" style={{ color: themeVars["--gallery-muted"] }} />
-            <h2 className="text-xl font-semibold mb-2">No photos yet</h2>
+            <h2 className="text-xl font-semibold mb-2">
+              {searchResults ? "No matching photos" : "No photos yet"}
+            </h2>
             <p style={{ color: themeVars["--gallery-muted"] }}>
-              Photos will appear here once they&apos;re uploaded.
+              {searchResults
+                ? "Try a different search term."
+                : "Photos will appear here once they're uploaded."}
             </p>
           </div>
-        ) : hasPhotoSets ? (
+        ) : hasPhotoSets && !searchResults ? (
           // Render by sets
           <div className="space-y-12">
             {gallery.photoSets!.map((set) => {
@@ -515,7 +582,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
             )}
           </div>
         ) : (
-          renderPhotoGrid(gallery.photos)
+          renderPhotoGrid(displayPhotos)
         )}
       </main>
 
@@ -646,6 +713,27 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                     {selectedPhoto + 1} / {gallery.photos.length}
                   </span>
                   <div className="flex items-center gap-2">
+                    {/* Find Person button in lightbox */}
+                    {gallery.photos[selectedPhoto].analysis?.faceCount &&
+                      gallery.photos[selectedPhoto].analysis!.faceCount > 0 &&
+                      gallery.photos[selectedPhoto].analysis!.faceData && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-white hover:bg-white/20"
+                        disabled={findingPerson}
+                        onClick={() => {
+                          const photo = gallery.photos[selectedPhoto]
+                          const faces = photo.analysis?.faceData as FaceDataEntry[] | null
+                          if (faces && faces.length > 0) {
+                            handleFindPerson(photo.id, faces[0].faceId)
+                          }
+                        }}
+                      >
+                        <UserSearch className="h-4 w-4 mr-2" />
+                        {findingPerson ? "Finding..." : "Find Person"}
+                      </Button>
+                    )}
                     {/* Favorite button in lightbox */}
                     <Button
                       variant="ghost"
