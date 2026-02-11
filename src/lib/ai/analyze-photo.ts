@@ -6,6 +6,8 @@ import { PHOTO_ANALYSIS_PROMPT } from "./photo-analysis-prompt"
 import { PhotoAnalysisError, type PhotoAnalysisResult } from "./types"
 
 export async function analyzePhoto(photoId: string, galleryId: string): Promise<void> {
+  const startTime = Date.now()
+
   // Mark as processing
   await prisma.photoAnalysis.upsert({
     where: { photoId },
@@ -77,8 +79,28 @@ export async function analyzePhoto(photoId: string, galleryId: string): Promise<
         errorMessage: null,
       },
     })
+
+    const durationMs = Date.now() - startTime
+    console.log(JSON.stringify({
+      event: "photo_analysis_complete",
+      galleryId,
+      photoId,
+      durationMs,
+    }))
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error"
+    const durationMs = Date.now() - startTime
+    const errorCode = error instanceof PhotoAnalysisError ? error.code : "UNKNOWN"
+    const rawMessage = error instanceof Error ? error.message : "Unknown error"
+    const prefixedMessage = `[${errorCode}] ${rawMessage}`
+
+    console.log(JSON.stringify({
+      event: "photo_analysis_failed",
+      galleryId,
+      photoId,
+      errorCode,
+      errorMessage: rawMessage,
+      durationMs,
+    }))
 
     // Increment retry count and mark as failed
     await prisma.photoAnalysis.upsert({
@@ -87,12 +109,12 @@ export async function analyzePhoto(photoId: string, galleryId: string): Promise<
         photoId,
         galleryId,
         status: "FAILED",
-        errorMessage: message,
+        errorMessage: prefixedMessage,
         retryCount: 1,
       },
       update: {
         status: "FAILED",
-        errorMessage: message,
+        errorMessage: prefixedMessage,
         retryCount: { increment: 1 },
       },
     })
