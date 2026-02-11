@@ -1,6 +1,30 @@
 # Current Task
 
-## Status: COMPLETED
+## Status: PAUSED
+
+## Next Up: Gallery Enhancement Features
+Based on competitive analysis (Unscripted + Pixieset), two gallery-focused features to close gaps:
+
+### 1. Enhanced Client Proofing
+- Favorite limits (photographer sets max # of selections per client)
+- Client notes/comments on individual photos
+- CSV export of selected favorites
+- Preset favorite lists (e.g., "Album Picks", "Prints")
+- Closes gap vs Pixieset's proofing workflow
+
+### 2. Gallery Expiry & Reminders
+- Gallery expiry date field (photographer sets when gallery expires)
+- Automated reminder emails before expiry (e.g., 30d, 7d, 1d)
+- Expired gallery shows "gallery has expired" message
+- Closes gap vs Pixieset's expiry reminder system
+
+### Competitive Analysis Summary (Feb 11, 2026)
+Analyzed Unscripted vs us vs Pixieset. Key findings:
+- **Our AI search is a genuine differentiator** over both competitors
+- **Unscripted's moat is user acquisition** (posing library + marketplace), not features
+- **Pixieset's edge over us**: print store, enhanced proofing, gallery expiry, video, RAW support
+- **Don't copy**: posing library, marketplace, mobile-first (not our market)
+- Full analysis saved in plan transcript
 
 ## Recent Completions
 
