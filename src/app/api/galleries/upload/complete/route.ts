@@ -161,28 +161,31 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Auto-trigger AI analysis (throttled to once per hour)
+    // Auto-trigger AI analysis for uploads with >2 photos
+    // Throttled: skip if analysis already ran in the last hour
     try {
-      const galleryForAnalysis = await prisma.gallery.findUnique({
-        where: { id: galleryId },
-        select: { lastAnalysisTriggeredAt: true },
-      })
-
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-      const shouldTrigger =
-        !galleryForAnalysis?.lastAnalysisTriggeredAt ||
-        galleryForAnalysis.lastAnalysisTriggeredAt < oneHourAgo
-
-      if (shouldTrigger) {
-        await prisma.gallery.update({
+      if (createdPhotos.length > 2) {
+        const galleryForAnalysis = await prisma.gallery.findUnique({
           where: { id: galleryId },
-          data: { lastAnalysisTriggeredAt: new Date() },
+          select: { lastAnalysisTriggeredAt: true },
         })
 
-        // Fire-and-forget
-        analyzeGallery(galleryId).catch((err) => {
-          console.error(`Auto-analysis failed for gallery ${galleryId}:`, err)
-        })
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+        const shouldTrigger =
+          !galleryForAnalysis?.lastAnalysisTriggeredAt ||
+          galleryForAnalysis.lastAnalysisTriggeredAt < oneHourAgo
+
+        if (shouldTrigger) {
+          await prisma.gallery.update({
+            where: { id: galleryId },
+            data: { lastAnalysisTriggeredAt: new Date() },
+          })
+
+          // Fire-and-forget
+          analyzeGallery(galleryId).catch((err) => {
+            console.error(`Auto-analysis failed for gallery ${galleryId}:`, err)
+          })
+        }
       }
     } catch (err) {
       console.error("Failed to trigger auto-analysis:", err)
