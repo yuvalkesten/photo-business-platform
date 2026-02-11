@@ -150,4 +150,27 @@ import { Button } from "@/components/ui/button"
 - `NEXTAUTH_SECRET` - Session encryption secret
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET_NAME` - S3
-- `GEMINI_API_KEY` - Email classification AI
+- `GEMINI_API_KEY` - Gemini AI (email classification + photo analysis)
+
+### AI Photo Search Architecture
+
+Gallery photos are analyzed by Gemini Vision and indexed for search. The system lives in `src/lib/ai/`.
+
+**Indexing pipeline:**
+1. `analyze-gallery.ts` orchestrates batch processing (5 concurrent, 1s delay between batches)
+2. `analyze-photo.ts` fetches thumbnail from S3, sends to Gemini Vision via `gemini-vision.ts`
+3. Gemini returns structured JSON (description, people, activities, objects, scene, mood, tags)
+4. Results stored in `PhotoAnalysis` model with flattened `searchTags` for fast queries
+5. `person-clustering.ts` groups faces by role then LLM appearance matching → `PersonCluster` model
+
+**Search (two-stage RAG):**
+1. Postgres full-text search on descriptions + array overlap on `searchTags` → up to 50 candidates
+2. Gemini Flash ranks candidates by relevance to query → sorted results with scores
+
+**Triggers:**
+- Auto: fires after upload completion if >2 photos (throttled to 1hr per gallery)
+- Manual: POST `/api/galleries/[id]/analyze` from admin dashboard
+
+**Key models:** `PhotoAnalysis` (1:1 with Photo), `PersonCluster` (groups same person), Gallery fields (`aiSearchEnabled`, `analysisProgress`, `lastAnalysisTriggeredAt`)
+
+**Public gallery search actions don't require auth** (like other public gallery actions).
