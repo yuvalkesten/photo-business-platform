@@ -1,23 +1,56 @@
 "use client"
 
 import { signIn } from "next-auth/react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useState, Suspense } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Check, AlertCircle, Loader2 } from "lucide-react"
+import { signInSchema, type SignInInput } from "@/lib/validations/auth.schema"
 
 function SignInContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
   const error = searchParams.get("error")
-  const [isLoading, setIsLoading] = useState(false)
+  const registered = searchParams.get("registered")
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [credentialsError, setCredentialsError] = useState<string | null>(null)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<SignInInput>({
+    resolver: zodResolver(signInSchema),
+  })
 
   const handleGoogleSignIn = async () => {
-    setIsLoading(true)
+    setIsGoogleLoading(true)
     await signIn("google", { callbackUrl })
+  }
+
+  const onCredentialsSubmit = async (data: SignInInput) => {
+    setCredentialsError(null)
+    const result = await signIn("credentials", {
+      email: data.email,
+      password: data.password,
+      redirect: false,
+    })
+
+    if (result?.error) {
+      setCredentialsError("Invalid email or password")
+      return
+    }
+
+    router.push(callbackUrl)
   }
 
   return (
@@ -31,7 +64,18 @@ function SignInContent() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Error Message */}
+          {/* Success Message */}
+          {registered && (
+            <Alert>
+              <Check className="h-4 w-4" />
+              <AlertTitle>Account created</AlertTitle>
+              <AlertDescription>
+                Your account has been created. Sign in to get started.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* OAuth Error */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -39,20 +83,95 @@ function SignInContent() {
               <AlertDescription>
                 {error === "OAuthCallback"
                   ? "There was an error with the OAuth provider. Please try again."
-                  : "An error occurred during sign in. Please try again."}
+                  : error === "CredentialsSignin"
+                    ? "Invalid email or password."
+                    : "An error occurred during sign in. Please try again."}
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Sign In Button */}
+          {/* Email/Password Form */}
+          <form onSubmit={handleSubmit(onCredentialsSubmit)} className="space-y-4">
+            {credentialsError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{credentialsError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                {...register("email")}
+              />
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Your password"
+                {...register("password")}
+              />
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password.message}</p>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
+
+          <p className="text-center text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
+            <Link href="/auth/signup" className="text-primary underline-offset-4 hover:underline">
+              Sign up
+            </Link>
+          </p>
+
+          {/* Separator */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="w-full" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+
+          {/* Google Sign In */}
           <Button
             onClick={handleGoogleSignIn}
-            disabled={isLoading}
+            disabled={isGoogleLoading}
+            variant="outline"
             className="w-full"
             size="lg"
           >
-            {isLoading ? (
-              "Signing in..."
+            {isGoogleLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Signing in...
+              </>
             ) : (
               <>
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -79,15 +198,14 @@ function SignInContent() {
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            By signing in, you agree to access your Google Calendar and Gmail
-            for business features.
+            Google sign-in includes Calendar and Gmail integration.
           </p>
 
           {/* Features List */}
           <Separator />
 
           <div className="space-y-4">
-            <h3 className="text-sm font-medium">What you'll get:</h3>
+            <h3 className="text-sm font-medium">What you&apos;ll get:</h3>
             <ul className="space-y-3">
               <li className="flex items-start text-sm">
                 <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
