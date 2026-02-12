@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest, NextResponse, after } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { getS3Url, uploadBufferToS3 } from "@/lib/s3"
@@ -181,9 +181,12 @@ export async function POST(request: NextRequest) {
             data: { lastAnalysisTriggeredAt: new Date() },
           })
 
-          // Fire-and-forget
-          analyzeGallery(galleryId).catch((err) => {
-            console.error(`Auto-analysis failed for gallery ${galleryId}:`, err)
+          after(async () => {
+            try {
+              await analyzeGallery(galleryId)
+            } catch (err) {
+              console.error(`Auto-analysis failed for gallery ${galleryId}:`, err)
+            }
           })
         }
       }

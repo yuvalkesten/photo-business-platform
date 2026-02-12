@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { after } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/db"
 import { analyzeGallery, resetStaleProcessingRecords } from "@/lib/ai/analyze-gallery"
@@ -72,9 +73,12 @@ export async function POST(
         data: { analysisProgress: progress },
       })
 
-      // Fire-and-forget analysis
-      analyzeGallery(id).catch((error) => {
-        console.error(`Gallery retry analysis failed for ${id}:`, error)
+      after(async () => {
+        try {
+          await analyzeGallery(id)
+        } catch (error) {
+          console.error(`Gallery retry analysis failed for ${id}:`, error)
+        }
       })
 
       return NextResponse.json({
@@ -109,9 +113,12 @@ export async function POST(
     // Reset stale PROCESSING records before starting
     await resetStaleProcessingRecords(id)
 
-    // Fire-and-forget analysis
-    analyzeGallery(id).catch((error) => {
-      console.error(`Gallery analysis failed for ${id}:`, error)
+    after(async () => {
+      try {
+        await analyzeGallery(id)
+      } catch (error) {
+        console.error(`Gallery analysis failed for ${id}:`, error)
+      }
     })
 
     return NextResponse.json({

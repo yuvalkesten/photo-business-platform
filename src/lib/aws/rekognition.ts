@@ -90,8 +90,19 @@ export async function detectFaces(
 }
 
 export async function createCollection(collectionId: string): Promise<void> {
-  const command = new CreateCollectionCommand({ CollectionId: collectionId })
-  await client.send(command)
+  try {
+    const command = new CreateCollectionCommand({ CollectionId: collectionId })
+    await client.send(command)
+  } catch (error: unknown) {
+    // Ignore if collection already exists
+    if (
+      error instanceof Error &&
+      error.name === "ResourceAlreadyExistsException"
+    ) {
+      return
+    }
+    throw error
+  }
 }
 
 export async function deleteCollection(collectionId: string): Promise<void> {
