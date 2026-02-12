@@ -2,49 +2,35 @@ import { requireAuth } from "@/lib/auth/utils"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/db"
 import { ProjectStatus, LeadTemperature } from "@prisma/client"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import {
-  Users,
-  FolderKanban,
-  ImageIcon,
-  UserPlus,
-  FolderPlus,
-  ImagePlus,
-  Settings,
-  Building2,
-  Calendar,
-  ArrowRight,
   Target,
   Flame,
   AlertCircle,
+  Calendar,
+  ArrowRight,
+  FolderKanban,
+  Info,
+  MessageCircle,
 } from "lucide-react"
 
 async function getDashboardStats(userId: string) {
   const [
-    contactsCount,
-    organizationsCount,
     leadsCount,
     hotLeadsCount,
     overdueFollowUpsCount,
     projectsCount,
-    galleriesCount,
     recentLeads,
-    recentProjects,
     upcomingSessions,
   ] = await Promise.all([
-    prisma.contact.count({ where: { userId } }),
-    prisma.organization.count({ where: { userId } }),
-    // Leads count (INQUIRY or PROPOSAL_SENT)
     prisma.project.count({
       where: {
         userId,
         status: { in: [ProjectStatus.INQUIRY, ProjectStatus.PROPOSAL_SENT] },
       },
     }),
-    // Hot leads count
     prisma.project.count({
       where: {
         userId,
@@ -52,7 +38,6 @@ async function getDashboardStats(userId: string) {
         leadTemperature: LeadTemperature.HOT,
       },
     }),
-    // Overdue follow-ups count
     prisma.project.count({
       where: {
         userId,
@@ -60,7 +45,6 @@ async function getDashboardStats(userId: string) {
         nextFollowUpDate: { lt: new Date() },
       },
     }),
-    // Projects count (BOOKED and beyond, excluding CANCELLED)
     prisma.project.count({
       where: {
         userId,
@@ -69,8 +53,6 @@ async function getDashboardStats(userId: string) {
         },
       },
     }),
-    prisma.gallery.count({ where: { userId } }),
-    // Recent leads with overdue follow-ups first
     prisma.project.findMany({
       where: {
         userId,
@@ -81,17 +63,6 @@ async function getDashboardStats(userId: string) {
         { nextFollowUpDate: "asc" },
         { createdAt: "desc" },
       ],
-      take: 5,
-    }),
-    prisma.project.findMany({
-      where: {
-        userId,
-        status: {
-          notIn: [ProjectStatus.INQUIRY, ProjectStatus.PROPOSAL_SENT, ProjectStatus.CANCELLED],
-        },
-      },
-      include: { contact: true },
-      orderBy: { updatedAt: "desc" },
       take: 5,
     }),
     prisma.photoSession.findMany({
@@ -110,7 +81,6 @@ async function getDashboardStats(userId: string) {
     }),
   ])
 
-  // Helper to serialize Decimal values
   const serializeProject = (project: typeof recentLeads[0]) => ({
     ...project,
     budgetMin: project.budgetMin ? Number(project.budgetMin) : null,
@@ -120,7 +90,6 @@ async function getDashboardStats(userId: string) {
     paidAmount: project.paidAmount ? Number(project.paidAmount) : null,
   })
 
-  // Serialize sessions with their projects
   const serializedSessions = upcomingSessions.map((session) => ({
     ...session,
     project: {
@@ -134,15 +103,11 @@ async function getDashboardStats(userId: string) {
   }))
 
   return {
-    contactsCount,
-    organizationsCount,
     leadsCount,
     hotLeadsCount,
     overdueFollowUpsCount,
     projectsCount,
-    galleriesCount,
     recentLeads: recentLeads.map(serializeProject),
-    recentProjects: recentProjects.map(serializeProject),
     upcomingSessions: serializedSessions,
   }
 }
@@ -157,6 +122,32 @@ const projectStatusColors: Record<string, string> = {
   COMPLETED: "bg-gray-100 text-gray-800",
 }
 
+const avatarColors = [
+  "bg-blue-500",
+  "bg-emerald-500",
+  "bg-violet-500",
+  "bg-orange-500",
+  "bg-pink-500",
+  "bg-cyan-500",
+  "bg-amber-500",
+]
+
+function getGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Good morning"
+  if (hour < 17) return "Good afternoon"
+  return "Good evening"
+}
+
+function formatDate(): string {
+  return new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+}
+
 export default async function DashboardPage() {
   const user = await requireAuth()
 
@@ -166,383 +157,232 @@ export default async function DashboardPage() {
 
   const stats = await getDashboardStats(user.id)
 
+  const firstName = user.name?.split(" ")[0] || user.email?.split("@")[0] || "there"
+
   return (
-    <div className="p-6 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          Welcome back, {user.name || user.email}!
-        </p>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Leads Card */}
-        <Card className={stats.overdueFollowUpsCount > 0 ? "border-red-300" : ""}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Leads</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.leadsCount}</div>
-            <div className="flex gap-2 mt-1">
-              {stats.hotLeadsCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs text-red-600">
-                  <Flame className="h-3 w-3" />
-                  {stats.hotLeadsCount} hot
-                </span>
-              )}
-              {stats.overdueFollowUpsCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs text-orange-600">
-                  <AlertCircle className="h-3 w-3" />
-                  {stats.overdueFollowUpsCount} overdue
-                </span>
-              )}
-              {stats.hotLeadsCount === 0 && stats.overdueFollowUpsCount === 0 && (
-                <span className="text-xs text-muted-foreground">Active leads</span>
-              )}
-            </div>
-          </CardContent>
-          <CardFooter className="pt-0">
-            <Button variant="ghost" size="sm" asChild className="w-full">
-              <Link href="/dashboard/leads">
-                View all
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Projects Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Projects</CardTitle>
-            <FolderKanban className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.projectsCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.projectsCount === 0 ? "No active projects" : "Active projects"}
-            </p>
-          </CardContent>
-          <CardFooter className="pt-0">
-            <Button variant="ghost" size="sm" asChild className="w-full">
-              <Link href="/dashboard/projects">
-                View all
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Contacts Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Contacts</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.contactsCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.contactsCount === 0 ? "Add your first contact" : "Total contacts"}
-            </p>
-          </CardContent>
-          <CardFooter className="pt-0">
-            <Button variant="ghost" size="sm" asChild className="w-full">
-              <Link href="/dashboard/contacts">
-                View all
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Organizations Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Organizations</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.organizationsCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.organizationsCount === 0 ? "Add first organization" : "Total organizations"}
-            </p>
-          </CardContent>
-          <CardFooter className="pt-0">
-            <Button variant="ghost" size="sm" asChild className="w-full">
-              <Link href="/dashboard/organizations">
-                View all
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Galleries Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Galleries</CardTitle>
-            <ImageIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.galleriesCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.galleriesCount === 0 ? "Create your first gallery" : "Total galleries"}
-            </p>
-          </CardContent>
-          <CardFooter className="pt-0">
-            <Button variant="ghost" size="sm" asChild className="w-full">
-              <Link href="/dashboard/galleries">
-                View all
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="hover:bg-accent transition-colors cursor-pointer">
-            <Link href="/dashboard/contacts/new" className="block">
-              <CardHeader className="text-center pb-4">
-                <UserPlus className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <CardTitle className="text-base">Add Contact</CardTitle>
-              </CardHeader>
-            </Link>
-          </Card>
-
-          <Card className="hover:bg-accent transition-colors cursor-pointer">
-            <Link href="/dashboard/projects/new" className="block">
-              <CardHeader className="text-center pb-4">
-                <FolderPlus className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <CardTitle className="text-base">Create Project</CardTitle>
-              </CardHeader>
-            </Link>
-          </Card>
-
-          <Card className="hover:bg-accent transition-colors cursor-pointer">
-            <Link href="/dashboard/galleries/new" className="block">
-              <CardHeader className="text-center pb-4">
-                <ImagePlus className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <CardTitle className="text-base">New Gallery</CardTitle>
-              </CardHeader>
-            </Link>
-          </Card>
-
-          <Card className="hover:bg-accent transition-colors cursor-pointer">
-            <Link href="/dashboard/settings" className="block">
-              <CardHeader className="text-center pb-4">
-                <Settings className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <CardTitle className="text-base">Settings</CardTitle>
-              </CardHeader>
-            </Link>
-          </Card>
+    <div className="p-6 lg:p-8 space-y-8 max-w-7xl">
+      {/* Greeting Section */}
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">{formatDate()}</p>
+          <h1 className="text-3xl font-bold tracking-tight mt-1">
+            {getGreeting()}, {firstName}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Here&apos;s what&apos;s happening with your business today.
+          </p>
+        </div>
+        <div className="hidden md:flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-sm font-medium">{user.name}</p>
+            <p className="text-xs text-muted-foreground">Photographer</p>
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-navy text-white text-sm font-medium">
+            {user.name?.charAt(0)?.toUpperCase() || "U"}
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Leads */}
+      {/* Stats Cards Row - 3 cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Leads */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Recent Leads
-            </CardTitle>
-            <CardDescription>Your latest leads and follow-ups</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats.recentLeads.length > 0 ? (
-              <div className="space-y-4">
-                {stats.recentLeads.map((lead) => {
-                  const isOverdue = lead.nextFollowUpDate && new Date(lead.nextFollowUpDate) < new Date()
-                  return (
-                    <Link
-                      key={lead.id}
-                      href={`/dashboard/projects/${lead.id}`}
-                      className={`flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-accent/50 transition-colors ${
-                        isOverdue ? "bg-red-50" : ""
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{lead.name}</p>
-                          {lead.leadTemperature === "HOT" && (
-                            <Flame className="h-3 w-3 text-red-500" />
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {lead.contact.firstName} {lead.contact.lastName}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <Badge className={projectStatusColors[lead.status] || ""}>
-                          {lead.status.replace(/_/g, " ")}
-                        </Badge>
-                        {isOverdue && (
-                          <p className="text-xs text-red-600 mt-1">Follow-up overdue</p>
-                        )}
-                      </div>
-                    </Link>
-                  )
-                })}
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-muted-foreground">Leads</span>
+              <Info className="h-3.5 w-3.5 text-muted-foreground/50" />
+            </div>
+            <div className="text-4xl font-bold">{stats.leadsCount}</div>
+            {(stats.hotLeadsCount > 0 || stats.overdueFollowUpsCount > 0) && (
+              <div className="flex gap-3 mt-2">
+                {stats.hotLeadsCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs text-red-600">
+                    <Flame className="h-3 w-3" />
+                    {stats.hotLeadsCount} hot
+                  </span>
+                )}
+                {stats.overdueFollowUpsCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs text-orange-600">
+                    <AlertCircle className="h-3 w-3" />
+                    {stats.overdueFollowUpsCount} overdue
+                  </span>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No leads yet. Create your first lead to start tracking.
-              </p>
             )}
           </CardContent>
-          {stats.recentLeads.length > 0 && (
-            <CardFooter>
-              <Button variant="ghost" size="sm" asChild className="w-full">
-                <Link href="/dashboard/leads">
-                  View all leads
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
-            </CardFooter>
-          )}
         </Card>
 
-        {/* Recent Projects */}
+        {/* Unread Messages (placeholder) */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FolderKanban className="h-5 w-5" />
-              Active Projects
-            </CardTitle>
-            <CardDescription>Your booked and active projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats.recentProjects.length > 0 ? (
-              <div className="space-y-4">
-                {stats.recentProjects.map((project) => (
-                  <Link
-                    key={project.id}
-                    href={`/dashboard/projects/${project.id}`}
-                    className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-medium">{project.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {project.contact.firstName} {project.contact.lastName}
-                      </p>
-                    </div>
-                    <Badge className={projectStatusColors[project.status] || ""}>
-                      {project.status.replace(/_/g, " ")}
-                    </Badge>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No active projects. Convert leads to start projects.
-              </p>
-            )}
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-muted-foreground">Unread messages</span>
+              <Info className="h-3.5 w-3.5 text-muted-foreground/50" />
+            </div>
+            <div className="text-4xl font-bold">0</div>
           </CardContent>
-          {stats.recentProjects.length > 0 && (
-            <CardFooter>
-              <Button variant="ghost" size="sm" asChild className="w-full">
-                <Link href="/dashboard/projects">
-                  View all projects
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
-            </CardFooter>
-          )}
         </Card>
 
         {/* Upcoming Sessions */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Upcoming Sessions
-            </CardTitle>
-            <CardDescription>Your scheduled photo sessions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {stats.upcomingSessions.length > 0 ? (
-              <div className="space-y-4">
-                {stats.upcomingSessions.map((session) => (
-                  <Link
-                    key={session.id}
-                    href={`/dashboard/projects/${session.projectId}`}
-                    className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-medium">{session.title}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {session.project.name}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">
-                        {new Date(session.scheduledAt).toLocaleDateString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(session.startTime).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No upcoming sessions scheduled.
-              </p>
-            )}
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-muted-foreground">Upcoming sessions</span>
+              <Info className="h-3.5 w-3.5 text-muted-foreground/50" />
+            </div>
+            <div className="text-4xl font-bold">{stats.upcomingSessions.length}</div>
           </CardContent>
-          {stats.upcomingSessions.length > 0 && (
-            <CardFooter>
-              <Button variant="ghost" size="sm" asChild className="w-full">
-                <Link href="/dashboard/projects">
-                  View all sessions
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
-            </CardFooter>
-          )}
         </Card>
       </div>
 
-      {/* Account Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Account Information</CardTitle>
-          <CardDescription>Your current account details</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <dt className="text-sm font-medium text-muted-foreground">Name</dt>
-              <dd className="text-sm">{user.name || "Not set"}</dd>
+      {/* Two-Column Content Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Left: Recent Leads / Messages */}
+        <div className="lg:col-span-3 space-y-4">
+          <Card>
+            <div className="p-5 pb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Target className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-semibold">Recent leads</h2>
+              </div>
             </div>
-            <div className="space-y-1">
-              <dt className="text-sm font-medium text-muted-foreground">Email</dt>
-              <dd className="text-sm">{user.email}</dd>
+            <div className="px-5 pb-5">
+              {stats.recentLeads.length > 0 ? (
+                <div className="space-y-1">
+                  {stats.recentLeads.map((lead, index) => {
+                    const isOverdue = lead.nextFollowUpDate && new Date(lead.nextFollowUpDate) < new Date()
+                    const colorClass = avatarColors[index % avatarColors.length]
+                    const initials = `${lead.contact.firstName?.charAt(0) || ""}${lead.contact.lastName?.charAt(0) || ""}`.toUpperCase()
+                    return (
+                      <Link
+                        key={lead.id}
+                        href={`/dashboard/projects/${lead.id}`}
+                        className={`flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors ${
+                          isOverdue ? "bg-red-50/50" : ""
+                        }`}
+                      >
+                        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white text-xs font-medium ${colorClass}`}>
+                          {initials || "?"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium truncate">
+                              {lead.contact.firstName} {lead.contact.lastName}
+                            </p>
+                            {lead.leadTemperature === "HOT" && (
+                              <Flame className="h-3 w-3 flex-shrink-0 text-red-500" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {lead.name}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 text-right">
+                          <Badge variant="secondary" className={`text-[10px] ${projectStatusColors[lead.status] || ""}`}>
+                            {lead.status.replace(/_/g, " ")}
+                          </Badge>
+                          {isOverdue && (
+                            <p className="text-[10px] text-red-600 mt-0.5">Overdue</p>
+                          )}
+                        </div>
+                      </Link>
+                    )
+                  })}
+                  <Link
+                    href="/dashboard/leads"
+                    className="flex items-center justify-center gap-1 pt-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Show more
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <MessageCircle className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">No leads yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Create your first lead to start tracking.
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="space-y-1">
-              <dt className="text-sm font-medium text-muted-foreground">Role</dt>
-              <dd className="text-sm">
-                <Badge variant="secondary">{user.role}</Badge>
-              </dd>
+          </Card>
+        </div>
+
+        {/* Right: Upcoming Sessions / Quick Info */}
+        <div className="lg:col-span-2 space-y-4">
+          <Card>
+            <div className="p-5 pb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-semibold">Upcoming sessions</h2>
+              </div>
             </div>
-            <div className="space-y-1">
-              <dt className="text-sm font-medium text-muted-foreground">User ID</dt>
-              <dd className="text-sm font-mono text-xs">{user.id}</dd>
+            <div className="px-5 pb-5">
+              {stats.upcomingSessions.length > 0 ? (
+                <div className="space-y-1">
+                  {stats.upcomingSessions.map((session) => (
+                    <Link
+                      key={session.id}
+                      href={`/dashboard/projects/${session.projectId}`}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{session.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {session.project.contact.firstName} {session.project.contact.lastName}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-3">
+                        <p className="text-sm font-medium">
+                          {new Date(session.scheduledAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(session.startTime).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <Calendar className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground">No upcoming sessions</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Schedule sessions from your projects.
+                  </p>
+                </div>
+              )}
             </div>
-          </dl>
-        </CardContent>
-      </Card>
+          </Card>
+
+          {/* Active Projects mini card */}
+          <Card>
+            <div className="p-5 pb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-semibold">Active projects</h2>
+              </div>
+            </div>
+            <div className="px-5 pb-5">
+              <div className="text-3xl font-bold">{stats.projectsCount}</div>
+              <Link
+                href="/dashboard/projects"
+                className="flex items-center gap-1 mt-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                View all projects
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

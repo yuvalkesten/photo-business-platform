@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -32,6 +33,9 @@ import {
   Mail,
   MessageCircle,
   Receipt,
+  Search,
+  Bell,
+  Plus,
 } from "lucide-react"
 
 const navigation = [
@@ -68,11 +72,11 @@ function NavLink({
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
         isActive
-          ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          ? "bg-white/12 text-white"
+          : "text-white/70 hover:bg-white/8 hover:text-white"
       )}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className={cn("h-4 w-4", isActive ? "text-white" : "text-white/50")} />
       {children}
     </Link>
   )
@@ -80,10 +84,10 @@ function NavLink({
 
 function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-sidebar">
       {/* Logo */}
-      <div className="flex h-14 items-center border-b px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+      <div className="flex h-14 items-center border-b border-white/8 px-4">
+        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-white">
           <Camera className="h-6 w-6" />
           <span>PhotoBiz</span>
         </Link>
@@ -106,7 +110,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
       </ScrollArea>
 
       {/* Settings at bottom */}
-      <div className="border-t p-3">
+      <div className="border-t border-white/8 p-3">
         <NavLink href="/dashboard/settings" icon={Settings} onClick={onNavClick}>
           Settings
         </NavLink>
@@ -123,7 +127,7 @@ function UserMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-white text-sm font-medium">
             {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
           </div>
           <span className="hidden md:inline-block max-w-[150px] truncate">
@@ -169,14 +173,14 @@ export default function DashboardLayout({
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 border-r bg-background md:block">
+      <aside className="hidden w-64 flex-shrink-0 md:block">
         <SidebarContent />
       </aside>
 
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Header */}
-        <header className="flex h-14 items-center justify-between border-b bg-background px-4 md:justify-end">
+        <header className="flex h-14 items-center gap-4 border-b bg-white px-4">
           {/* Mobile Menu Button */}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
@@ -185,7 +189,7 @@ export default function DashboardLayout({
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0">
+            <SheetContent side="left" className="w-64 p-0 bg-sidebar border-none">
               <SidebarContent onNavClick={() => setMobileOpen(false)} />
             </SheetContent>
           </Sheet>
@@ -196,12 +200,43 @@ export default function DashboardLayout({
             <span>PhotoBiz</span>
           </Link>
 
-          {/* User Menu */}
-          <UserMenu />
+          {/* Search Bar */}
+          <div className="hidden md:flex flex-1 max-w-md">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search"
+                className="pl-9 rounded-full bg-secondary border-none h-9"
+              />
+            </div>
+          </div>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Right side actions */}
+          <div className="flex items-center gap-2">
+            {/* + New Button */}
+            <Button size="sm" asChild>
+              <Link href="/dashboard/projects/new">
+                <Plus className="h-4 w-4 mr-1" />
+                New
+              </Link>
+            </Button>
+
+            {/* Notifications */}
+            <Button variant="ghost" size="icon" className="relative">
+              <Bell className="h-5 w-5" />
+              <span className="sr-only">Notifications</span>
+            </Button>
+
+            {/* User Menu */}
+            <UserMenu />
+          </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-muted/30">
+        <main className="flex-1 overflow-auto bg-white">
           {children}
         </main>
       </div>
