@@ -21,9 +21,9 @@ export const gallerySchema = z.object({
   requireEmail: z.boolean().default(false),
 
   // Theming
-  theme: z.enum(["classic", "modern", "editorial", "dark", "minimal"]).default("classic"),
+  theme: z.enum(["classic", "modern", "warm", "dark", "minimal"]).default("classic"),
   gridStyle: z.enum(["grid", "masonry", "column", "row"]).default("grid"),
-  fontFamily: z.enum(["inter", "playfair", "cormorant", "lora", "montserrat"]).default("inter"),
+  fontFamily: z.enum(["dm-sans", "inter", "cormorant", "lora", "montserrat"]).default("dm-sans"),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color").default("#000000"),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Invalid color").default("#8b5cf6"),
 

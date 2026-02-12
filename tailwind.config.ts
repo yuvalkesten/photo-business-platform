@@ -16,6 +16,10 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-dm-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-geist-mono)", "monospace"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -50,11 +54,40 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        honey: {
+          50: "#FFFDF5",
+          100: "#FFF5D6",
+          200: "#FFEDAB",
+          300: "#FFE380",
+          400: "#FFD952",
+          500: "#E5C23D",
+          600: "#CCB035",
+          700: "#A08A2A",
+          800: "#736320",
+          900: "#4D4215",
+        },
+        cream: {
+          50: "#FDFCFA",
+          100: "#FAF7F2",
+          200: "#F3EDE4",
+          300: "#E5DFD6",
+        },
+        navy: {
+          DEFAULT: "#161A22",
+          light: "#2D3240",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        pill: "9999px",
+      },
+      boxShadow: {
+        honey: "0 4px 16px rgba(255, 217, 82, 0.25)",
+        "honey-lg": "0 8px 32px rgba(255, 217, 82, 0.3)",
+        warm: "0 2px 8px rgba(22, 26, 34, 0.06)",
+        "warm-lg": "0 8px 24px rgba(22, 26, 34, 0.1)",
       },
       keyframes: {
         "accordion-down": {
