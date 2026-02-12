@@ -3,13 +3,14 @@
 import { prisma } from "@/lib/db"
 import bcrypt from "bcryptjs"
 
-export async function getPublicGallery(shareToken: string, password?: string) {
+export async function getPublicGallery(shareToken: string, password?: string, bypassPassword?: boolean) {
   try {
     const gallery = await prisma.gallery.findUnique({
       where: { shareToken },
       include: {
         photos: {
           orderBy: { order: "asc" },
+          take: 500,
           select: {
             id: true,
             filename: true,
@@ -82,7 +83,7 @@ export async function getPublicGallery(shareToken: string, password?: string) {
     }
 
     // Check if gallery requires password
-    if (gallery.password) {
+    if (gallery.password && !bypassPassword) {
       if (!password) {
         return { requiresPassword: true, galleryTitle: gallery.title }
       }

@@ -1,10 +1,11 @@
+import { cookies } from "next/headers"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { getPublicGallery } from "@/actions/galleries/get-public-gallery"
 import { GalleryWithEmailGate } from "./GalleryWithEmailGate"
 import { PasswordForm } from "./PasswordForm"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Camera, Lock, AlertCircle } from "lucide-react"
+import { Lock, AlertCircle } from "lucide-react"
 
 interface PublicGalleryPageProps {
   params: Promise<{ token: string }>
@@ -53,7 +54,13 @@ export default async function PublicGalleryPage({ params, searchParams }: Public
   const { token } = await params
   const { password } = await searchParams
 
-  const result = await getPublicGallery(token, password)
+  // Check for httpOnly cookie (set by verifyGalleryPassword action)
+  const cookieStore = await cookies()
+  const accessCookie = cookieStore.get(`gallery_access_${token}`)
+  const hasPasswordCookie = accessCookie?.value === "granted"
+
+  // Fetch gallery — bypass password check if cookie proves prior validation
+  const result = await getPublicGallery(token, password, hasPasswordCookie)
 
   // Gallery not found
   if (result.error === "Gallery not found") {

@@ -3,8 +3,8 @@ import { analyzePhoto } from "./analyze-photo"
 import { clusterPersons } from "./person-clustering"
 import { ensureCollection } from "./index-faces"
 
-const BATCH_SIZE = 3
-const BATCH_DELAY_MS = 2000
+const BATCH_SIZE = 10
+const BATCH_DELAY_MS = 500
 const STALE_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
 const MAX_RETRIES = 3
 const RETRY_DELAYS_MS = [2000, 4000, 8000]

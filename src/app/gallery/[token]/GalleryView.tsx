@@ -391,6 +391,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
         <img
           src={photo.thumbnailUrl || photo.s3Url}
           alt={photo.filename}
+          loading="lazy"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
@@ -860,6 +861,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
               <img
                 src={gallery.photos[selectedPhoto].s3Url}
                 alt={gallery.photos[selectedPhoto].filename}
+                loading="eager"
                 className="max-w-full max-h-full object-contain"
               />
 
