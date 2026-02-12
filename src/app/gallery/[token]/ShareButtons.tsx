@@ -16,9 +16,11 @@ interface ShareButtonsProps {
   url: string
   description?: string
   coverImage?: string | null
+  iconOnly?: boolean
+  style?: React.CSSProperties
 }
 
-export function ShareButtons({ title, url, description, coverImage }: ShareButtonsProps) {
+export function ShareButtons({ title, url, description, coverImage, iconOnly, style }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false)
   const { toast } = useToast()
 
@@ -78,6 +80,13 @@ export function ShareButtons({ title, url, description, coverImage }: ShareButto
 
   // Use native share on mobile if available
   if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+    if (iconOnly) {
+      return (
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={shareNative} style={style}>
+          <Share2 className="h-4 w-4" />
+        </Button>
+      )
+    }
     return (
       <Button variant="outline" size="sm" onClick={shareNative}>
         <Share2 className="h-4 w-4 mr-2" />
@@ -89,10 +98,16 @@ export function ShareButtons({ title, url, description, coverImage }: ShareButto
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Share2 className="h-4 w-4 mr-2" />
-          Share
-        </Button>
+        {iconOnly ? (
+          <Button variant="ghost" size="icon" className="h-9 w-9" style={style}>
+            <Share2 className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm">
+            <Share2 className="h-4 w-4 mr-2" />
+            Share
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem onClick={copyLink}>

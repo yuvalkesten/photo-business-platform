@@ -20,6 +20,7 @@ import {
   Play,
   Info,
   ArrowLeft,
+  Search,
 } from "lucide-react"
 import { ShareButtons } from "./ShareButtons"
 import { FavoritesBar } from "./FavoritesBar"
@@ -127,6 +128,8 @@ export function GalleryView({ gallery }: GalleryViewProps) {
     photoIds: string[]
     description: string | null
   } | null>(null)
+  const [activeSetId, setActiveSetId] = useState<string | null>(null)
+  const [showSearchPanel, setShowSearchPanel] = useState(false)
 
   const theme = (gallery.theme || "classic") as GalleryTheme
   const themeVars = GALLERY_THEMES[theme]?.vars || GALLERY_THEMES.classic.vars
@@ -210,27 +213,39 @@ export function GalleryView({ gallery }: GalleryViewProps) {
     setShowInfoPanel(false)
   }
 
+  const hasPhotoSets = gallery.photoSets && gallery.photoSets.length > 0
+
+  // Determine if favorite limit is reached
+  const atFavoriteLimit = gallery.favoriteLimit
+    ? favoriteIds.size >= gallery.favoriteLimit
+    : false
+
+  // Filter photos by person selection, search results, or active tab
+  const displayPhotos = selectedPerson
+    ? gallery.photos.filter((p) => selectedPerson.photoIds.includes(p.id))
+    : searchResults
+      ? gallery.photos.filter((p) => searchResults.has(p.id))
+      : hasPhotoSets && activeSetId !== null
+        ? gallery.photos.filter((p) => p.setId === activeSetId)
+        : gallery.photos
+
   const goToPrevious = () => {
     if (selectedPhoto === null) return
     setShowInfoPanel(false)
-    const photos = selectedPerson
-      ? gallery.photos.filter((p) => selectedPerson.photoIds.includes(p.id))
-      : gallery.photos
-    const currentIdx = photos.findIndex((p) => p.id === gallery.photos[selectedPhoto]?.id)
-    const prevIdx = currentIdx <= 0 ? photos.length - 1 : currentIdx - 1
-    const globalIdx = gallery.photos.findIndex((p) => p.id === photos[prevIdx]?.id)
+    const currentIdx = displayPhotos.findIndex((p) => p.id === gallery.photos[selectedPhoto]?.id)
+    if (currentIdx < 0) return
+    const prevIdx = currentIdx <= 0 ? displayPhotos.length - 1 : currentIdx - 1
+    const globalIdx = gallery.photos.findIndex((p) => p.id === displayPhotos[prevIdx]?.id)
     if (globalIdx >= 0) setSelectedPhoto(globalIdx)
   }
 
   const goToNext = () => {
     if (selectedPhoto === null) return
     setShowInfoPanel(false)
-    const photos = selectedPerson
-      ? gallery.photos.filter((p) => selectedPerson.photoIds.includes(p.id))
-      : gallery.photos
-    const currentIdx = photos.findIndex((p) => p.id === gallery.photos[selectedPhoto]?.id)
-    const nextIdx = currentIdx >= photos.length - 1 ? 0 : currentIdx + 1
-    const globalIdx = gallery.photos.findIndex((p) => p.id === photos[nextIdx]?.id)
+    const currentIdx = displayPhotos.findIndex((p) => p.id === gallery.photos[selectedPhoto]?.id)
+    if (currentIdx < 0) return
+    const nextIdx = currentIdx >= displayPhotos.length - 1 ? 0 : currentIdx + 1
+    const globalIdx = gallery.photos.findIndex((p) => p.id === displayPhotos[nextIdx]?.id)
     if (globalIdx >= 0) setSelectedPhoto(globalIdx)
   }
 
@@ -252,18 +267,6 @@ export function GalleryView({ gallery }: GalleryViewProps) {
 
   const favoritePhotos = gallery.photos.filter((p) => favoriteIds.has(p.id))
 
-  // Determine if favorite limit is reached
-  const atFavoriteLimit = gallery.favoriteLimit
-    ? favoriteIds.size >= gallery.favoriteLimit
-    : false
-
-  // Filter photos by person selection or search results
-  const displayPhotos = selectedPerson
-    ? gallery.photos.filter((p) => selectedPerson.photoIds.includes(p.id))
-    : searchResults
-      ? gallery.photos.filter((p) => searchResults.has(p.id))
-      : gallery.photos
-
   // Handle person selection (from info panel or people row)
   const handleSelectPerson = (person: {
     clusterId: string
@@ -278,35 +281,27 @@ export function GalleryView({ gallery }: GalleryViewProps) {
     closeLightbox()
   }
 
-  // Group photos by sets
-  const photosBySet = new Map<string | null, Photo[]>()
-  if (gallery.photoSets && gallery.photoSets.length > 0) {
-    for (const set of gallery.photoSets) {
-      photosBySet.set(set.id, [])
-    }
-    photosBySet.set(null, []) // uncategorized
-    for (const photo of displayPhotos) {
-      const bucket = photosBySet.get(photo.setId ?? null) || photosBySet.get(null)!
-      bucket.push(photo)
-    }
-  }
-
-  const hasPhotoSets = gallery.photoSets && gallery.photoSets.length > 0
-
   // Get global photo index for lightbox from a set photo
   const getGlobalIndex = (photo: Photo) => gallery.photos.findIndex((p) => p.id === photo.id)
+
+  // Section heading title
+  const sectionTitle = searchResults
+    ? "Search Results"
+    : hasPhotoSets && activeSetId !== null
+      ? gallery.photoSets!.find((s) => s.id === activeSetId)?.name || gallery.title
+      : gallery.title
 
   // Render photo grid based on grid style
   const renderPhotoGrid = (photos: Photo[]) => {
     if (gridStyle === "masonry") {
       return (
-        <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-2">
+        <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-[3px]">
           {photos.map((photo) => (
             <PhotoCard
               key={photo.id}
               photo={photo}
               index={getGlobalIndex(photo)}
-              className="mb-2 break-inside-avoid"
+              className="mb-[3px] break-inside-avoid"
               aspectFree
             />
           ))}
@@ -332,7 +327,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
 
     if (gridStyle === "row") {
       return (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-[3px]">
           {photos.map((photo) => {
             const aspect = (photo.width || 4) / (photo.height || 3)
             return (
@@ -352,8 +347,8 @@ export function GalleryView({ gallery }: GalleryViewProps) {
 
     // Default: grid
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-        {photos.map((photo, idx) => (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-[3px]">
+        {photos.map((photo) => (
           <PhotoCard
             key={photo.id}
             photo={photo}
@@ -364,7 +359,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
     )
   }
 
-  // Photo card component
+  // Photo card component — PicTime style
   function PhotoCard({
     photo,
     index,
@@ -384,7 +379,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
     return (
       <button
         onClick={() => openLightbox(index)}
-        className={`relative overflow-hidden rounded-lg group focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+        className={`relative overflow-hidden group focus:outline-none focus:ring-2 focus:ring-offset-2 ${
           aspectFree ? "" : "aspect-square"
         } ${className}`}
         style={{
@@ -396,49 +391,59 @@ export function GalleryView({ gallery }: GalleryViewProps) {
         <img
           src={photo.thumbnailUrl || photo.s3Url}
           alt={photo.filename}
-          className={`w-full h-full object-cover transition-transform group-hover:scale-105`}
+          className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
 
-        {/* Favorite heart button */}
+        {/* Favorite heart — simple white icon with drop shadow */}
         <div
           className={`absolute top-2 left-2 transition-opacity ${
             isFav ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           }`}
         >
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-8 w-8"
+          <button
             disabled={!canFavorite && !isFav}
             onClick={(e) => {
               e.stopPropagation()
               handleToggleFavorite(photo.id)
             }}
+            className="p-1 focus:outline-none disabled:opacity-40"
           >
             <Heart
-              className={`h-4 w-4 ${
-                isFav ? "text-red-500 fill-red-500" : "text-foreground"
+              className={`h-5 w-5 drop-shadow-md ${
+                isFav ? "text-red-500 fill-red-500" : "text-white fill-white/30"
               }`}
             />
-          </Button>
+          </button>
         </div>
+      </button>
+    )
+  }
 
-        {/* Download button */}
-        {gallery.allowDownload && (
-          <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8"
-              onClick={(e) => {
-                e.stopPropagation()
-                downloadPhoto(photo)
-              }}
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-          </div>
+  // Tab button component — PicTime style
+  function TabButton({
+    active,
+    onClick,
+    children,
+  }: {
+    active: boolean
+    onClick: () => void
+    children: React.ReactNode
+  }) {
+    return (
+      <button
+        onClick={onClick}
+        className={`relative px-3 py-3 text-xs font-medium uppercase tracking-[0.15em] transition-colors whitespace-nowrap ${
+          active ? "" : "opacity-60 hover:opacity-80"
+        }`}
+        style={{ color: active ? themeVars["--gallery-text"] : themeVars["--gallery-muted"] }}
+      >
+        {children}
+        {active && (
+          <span
+            className="absolute bottom-0 left-0 right-0 h-[2px]"
+            style={{ backgroundColor: accentColor }}
+          />
         )}
       </button>
     )
@@ -470,7 +475,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
         />
       )}
 
-      {/* Header */}
+      {/* PicTime-style Navigation Bar */}
       <header
         className="border-b sticky top-0 z-40 backdrop-blur"
         style={{
@@ -478,36 +483,60 @@ export function GalleryView({ gallery }: GalleryViewProps) {
           borderColor: themeVars["--gallery-border"],
         }}
       >
-        <div className="container max-w-7xl mx-auto px-4 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
+        <div className="container max-w-7xl mx-auto px-4">
+          {/* Main nav row */}
+          <div className="flex items-center justify-between h-14">
+            {/* Left: Logo / Photographer name */}
+            <div className="shrink-0">
               {gallery.photographer.brandLogo ? (
-                <div className="mb-2">
-                  <img
-                    src={gallery.photographer.brandLogo}
-                    alt={gallery.photographer.name || "Photographer"}
-                    className="h-12 max-w-[200px] object-contain"
-                  />
-                </div>
+                <img
+                  src={gallery.photographer.brandLogo}
+                  alt={gallery.photographer.name || "Photographer"}
+                  className="h-8 max-w-[160px] object-contain"
+                />
               ) : (
-                <div className="flex items-center gap-2 text-sm mb-1" style={{ color: themeVars["--gallery-muted"] }}>
+                <div
+                  className="flex items-center gap-2 text-sm font-medium"
+                  style={{ color: themeVars["--gallery-text"] }}
+                >
                   <Camera className="h-4 w-4" />
                   <span>{gallery.photographer.name || "Photographer"}</span>
                 </div>
               )}
-              <h1 className="text-2xl font-bold">{gallery.title}</h1>
-              <p style={{ color: themeVars["--gallery-muted"] }}>
-                {gallery.project.name} &bull; {gallery.photos.length} photos
-              </p>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {gallery.photos.length > 1 && (
-                <Button
-                  onClick={() => setShowSlideshow(true)}
-                  variant={theme === "dark" ? "secondary" : "outline"}
+
+            {/* Center: Photo set tabs (desktop) */}
+            {hasPhotoSets && !selectedPerson && !searchResults && (
+              <nav className="hidden md:flex items-center gap-1">
+                <TabButton
+                  active={activeSetId === null}
+                  onClick={() => setActiveSetId(null)}
                 >
-                  <Play className="h-4 w-4 mr-2" />
-                  Slideshow
+                  ALL
+                </TabButton>
+                {gallery.photoSets!.map((set) => (
+                  <TabButton
+                    key={set.id}
+                    active={activeSetId === set.id}
+                    onClick={() => setActiveSetId(set.id)}
+                  >
+                    {set.name.toUpperCase()}
+                  </TabButton>
+                ))}
+              </nav>
+            )}
+
+            {/* Right: Icon action buttons */}
+            <div className="flex items-center gap-0.5">
+              {gallery.aiSearchEnabled && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setShowSearchPanel(!showSearchPanel)}
+                  style={{ color: showSearchPanel ? accentColor : themeVars["--gallery-text"] }}
+                >
+                  <Search className="h-4 w-4" />
                 </Button>
               )}
               <ShareButtons
@@ -515,68 +544,112 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                 url={typeof window !== "undefined" ? window.location.href : ""}
                 description={gallery.description || `${gallery.photos.length} photos from ${gallery.project.name}`}
                 coverImage={gallery.coverImage}
+                iconOnly
+                style={{ color: themeVars["--gallery-text"] }}
               />
+              {favoriteIds.size > 0 && (
+                <div className="relative flex items-center justify-center h-9 w-9">
+                  <Heart className="h-4 w-4" style={{ color: themeVars["--gallery-text"] }} />
+                  <span
+                    className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full text-[10px] font-bold flex items-center justify-center text-white px-1"
+                    style={{ backgroundColor: accentColor }}
+                  >
+                    {favoriteIds.size}
+                  </span>
+                </div>
+              )}
               {gallery.allowDownload && gallery.photos.length > 0 && (
                 <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
                   onClick={() => setShowDownloadManager(true)}
-                  variant={theme === "dark" ? "secondary" : "outline"}
+                  style={{ color: themeVars["--gallery-text"] }}
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download All
+                  <Download className="h-4 w-4" />
+                </Button>
+              )}
+              {gallery.photos.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setShowSlideshow(true)}
+                  style={{ color: themeVars["--gallery-text"] }}
+                >
+                  <Play className="h-4 w-4" />
                 </Button>
               )}
             </div>
           </div>
 
+          {/* Mobile tabs row */}
+          {hasPhotoSets && !selectedPerson && !searchResults && (
+            <div
+              className="md:hidden overflow-x-auto flex gap-1 pb-2 -mx-4 px-4"
+              style={{ scrollbarWidth: "none" }}
+            >
+              <TabButton
+                active={activeSetId === null}
+                onClick={() => setActiveSetId(null)}
+              >
+                ALL
+              </TabButton>
+              {gallery.photoSets!.map((set) => (
+                <TabButton
+                  key={set.id}
+                  active={activeSetId === set.id}
+                  onClick={() => setActiveSetId(set.id)}
+                >
+                  {set.name.toUpperCase()}
+                </TabButton>
+              ))}
+            </div>
+          )}
+
           {/* Favorite limit indicator */}
           {gallery.favoriteLimit && (
-            <div className="mt-2 text-sm" style={{ color: themeVars["--gallery-muted"] }}>
-              Favorites: {favoriteIds.size} of {gallery.favoriteLimit} selected
-              {atFavoriteLimit && <span className="ml-2 font-medium" style={{ color: accentColor }}>Limit reached</span>}
+            <div className="pb-2 text-xs" style={{ color: themeVars["--gallery-muted"] }}>
+              Favorites: {favoriteIds.size} / {gallery.favoriteLimit}
+              {atFavoriteLimit && (
+                <span className="ml-2 font-medium" style={{ color: accentColor }}>
+                  Limit reached
+                </span>
+              )}
             </div>
           )}
         </div>
       </header>
 
-      {/* Description */}
-      {gallery.description && (
-        <div className="container max-w-7xl mx-auto px-4 py-6">
-          <p className="max-w-2xl" style={{ color: themeVars["--gallery-muted"] }}>{gallery.description}</p>
-        </div>
-      )}
-
-      {/* AI Search */}
-      {gallery.aiSearchEnabled && (
-        <div className="container max-w-7xl mx-auto px-4 pb-4 space-y-3">
-          <GallerySearch
-            galleryId={gallery.id}
-            photos={gallery.photos}
-            totalPhotos={gallery.photos.length}
-            onSearchResults={(results) => {
-              setSearchResults(results)
-              if (results) setSelectedPerson(null)
+      {/* Collapsible Search Panel */}
+      {showSearchPanel && gallery.aiSearchEnabled && (
+        <div className="container max-w-7xl mx-auto px-4 pt-4">
+          <div
+            className="p-3 rounded-lg border"
+            style={{
+              borderColor: themeVars["--gallery-border"],
+              backgroundColor: themeVars["--gallery-card-bg"] || themeVars["--gallery-bg"],
             }}
-            personClusters={gallery.personClusters || []}
-            themeVars={themeVars}
-            accentColor={accentColor}
-          />
-          {/* People Row */}
-          {(gallery.personClusters?.length ?? 0) > 0 && !selectedPerson && (
-            <PeopleRow
-              personClusters={gallery.personClusters!}
+          >
+            <GallerySearch
+              galleryId={gallery.id}
               photos={gallery.photos}
-              selectedPersonId={null}
-              onSelectPerson={handleSelectPerson}
+              totalPhotos={gallery.photos.length}
+              onSearchResults={(results) => {
+                setSearchResults(results)
+                if (results) setSelectedPerson(null)
+              }}
+              personClusters={gallery.personClusters || []}
               themeVars={themeVars}
               accentColor={accentColor}
             />
-          )}
+          </div>
         </div>
       )}
 
-      {/* People Row (when AI search is off but clusters exist) */}
-      {!gallery.aiSearchEnabled && (gallery.personClusters?.length ?? 0) > 0 && !selectedPerson && (
-        <div className="container max-w-7xl mx-auto px-4 pb-4">
+      {/* People Row */}
+      {(gallery.personClusters?.length ?? 0) > 0 && !selectedPerson && (
+        <div className="container max-w-7xl mx-auto px-4 pt-4">
           <PeopleRow
             personClusters={gallery.personClusters!}
             photos={gallery.photos}
@@ -590,9 +663,7 @@ export function GalleryView({ gallery }: GalleryViewProps) {
 
       {/* Person View Header */}
       {selectedPerson && (
-        <div
-          className="container max-w-7xl mx-auto px-4 pb-4"
-        >
+        <div className="container max-w-7xl mx-auto px-4 pt-4">
           <div
             className="flex items-center gap-3 p-3 rounded-lg"
             style={{
@@ -630,8 +701,31 @@ export function GalleryView({ gallery }: GalleryViewProps) {
         </div>
       )}
 
+      {/* Centered Section Heading */}
+      {!selectedPerson && (
+        <div className="text-center py-6 sm:py-8">
+          <h1 className="text-2xl sm:text-3xl font-light uppercase tracking-[0.2em]">
+            {sectionTitle}
+          </h1>
+          {!searchResults && !hasPhotoSets && gallery.description && (
+            <p
+              className="mt-2 text-sm max-w-lg mx-auto px-4"
+              style={{ color: themeVars["--gallery-muted"] }}
+            >
+              {gallery.description}
+            </p>
+          )}
+          <p
+            className="mt-1 text-xs uppercase tracking-[0.1em]"
+            style={{ color: themeVars["--gallery-muted"] }}
+          >
+            {displayPhotos.length} photo{displayPhotos.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      )}
+
       {/* Gallery Grid */}
-      <main className="container max-w-7xl mx-auto px-4 py-6 pb-24">
+      <main className="container max-w-7xl mx-auto px-4 pb-24">
         {displayPhotos.length === 0 ? (
           <div className="text-center py-20">
             <Camera className="h-16 w-16 mx-auto mb-4" style={{ color: themeVars["--gallery-muted"] }} />
@@ -643,38 +737,6 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                 ? "Try a different search term."
                 : "Photos will appear here once they're uploaded."}
             </p>
-          </div>
-        ) : hasPhotoSets && !searchResults && !selectedPerson ? (
-          // Render by sets
-          <div className="space-y-12">
-            {gallery.photoSets!.map((set) => {
-              const setPhotos = photosBySet.get(set.id) || []
-              if (setPhotos.length === 0) return null
-              return (
-                <section key={set.id}>
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold">{set.name}</h2>
-                    {set.description && (
-                      <p className="text-sm mt-1" style={{ color: themeVars["--gallery-muted"] }}>
-                        {set.description}
-                      </p>
-                    )}
-                  </div>
-                  {renderPhotoGrid(setPhotos)}
-                </section>
-              )
-            })}
-            {/* Uncategorized photos */}
-            {(photosBySet.get(null)?.length ?? 0) > 0 && (
-              <section>
-                {gallery.photoSets!.length > 0 && (
-                  <div className="mb-4">
-                    <h2 className="text-xl font-semibold">More Photos</h2>
-                  </div>
-                )}
-                {renderPhotoGrid(photosBySet.get(null)!)}
-              </section>
-            )}
           </div>
         ) : (
           renderPhotoGrid(displayPhotos)
