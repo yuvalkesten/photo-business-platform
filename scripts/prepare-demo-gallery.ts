@@ -26,6 +26,10 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import {
   RekognitionClient,
   DetectFacesCommand,
+  IndexFacesCommand,
+  SearchFacesCommand,
+  CreateCollectionCommand,
+  DeleteCollectionCommand,
   type FaceDetail,
 } from "@aws-sdk/client-rekognition"
 import { GoogleGenAI, createPartFromBase64 } from "@google/genai"
@@ -105,6 +109,8 @@ interface PersonFace {
   position: { x: number; y: number; width: number; height: number }
   confidence?: number
   detectionSource?: "rekognition" | "llm"
+  rekognitionFaceId?: string
+  personClusterId?: string
 }
 
 interface PhotoAnalysisResult {
@@ -395,43 +401,184 @@ function extractSearchTags(
 }
 
 // ---------------------------------------------------------------------------
-// Step 8: Person clustering (role-based for fixture, no Rekognition IDs)
+// Step 8a: Face cropping + indexing into Rekognition collection
 // ---------------------------------------------------------------------------
-function clusterByRole(
+const FACE_PADDING = 0.4
+
+async function cropFace(
+  imageBuffer: Buffer,
+  box: { x: number; y: number; width: number; height: number },
+  imgWidth: number,
+  imgHeight: number
+): Promise<Buffer | null> {
+  const padW = box.width * FACE_PADDING
+  const padH = box.height * FACE_PADDING
+
+  const left = Math.max(0, Math.round((box.x - padW) * imgWidth))
+  const top = Math.max(0, Math.round((box.y - padH) * imgHeight))
+  const right = Math.min(imgWidth, Math.round((box.x + box.width + padW) * imgWidth))
+  const bottom = Math.min(imgHeight, Math.round((box.y + box.height + padH) * imgHeight))
+
+  const cropWidth = right - left
+  const cropHeight = bottom - top
+  if (cropWidth < 20 || cropHeight < 20) return null
+
+  try {
+    return await sharp(imageBuffer)
+      .extract({ left, top, width: cropWidth, height: cropHeight })
+      .jpeg({ quality: 85 })
+      .toBuffer()
+  } catch {
+    return null
+  }
+}
+
+async function indexFaceIntoCollection(
+  collectionId: string,
+  faceBuffer: Buffer,
+  externalId: string
+): Promise<string | null> {
+  try {
+    const res = await rekognition.send(
+      new IndexFacesCommand({
+        CollectionId: collectionId,
+        Image: { Bytes: faceBuffer },
+        ExternalImageId: externalId,
+        MaxFaces: 1,
+        DetectionAttributes: ["DEFAULT"],
+      })
+    )
+    return res.FaceRecords?.[0]?.Face?.FaceId ?? null
+  } catch (error) {
+    console.warn(`    Index face failed for ${externalId}:`,
+      error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
+// Track indexed faces for clustering
+interface IndexedFaceEntry {
+  rekognitionFaceId: string
+  templateId: string
+  faceIndex: number
+  face: PersonFace
+}
+
+const allIndexedFaces: IndexedFaceEntry[] = []
+
+async function indexPhotoFaces(
+  collectionId: string,
+  jpegBuffer: Buffer,
+  templateId: string,
+  cvFaces: CVDetectedFace[],
+  mergedFaces: PersonFace[]
+): Promise<void> {
+  const metadata = await sharp(jpegBuffer).metadata()
+  const imgWidth = metadata.width ?? 1
+  const imgHeight = metadata.height ?? 1
+
+  for (let i = 0; i < cvFaces.length; i++) {
+    const cropped = await cropFace(jpegBuffer, cvFaces[i].boundingBox, imgWidth, imgHeight)
+    if (!cropped) continue
+
+    const externalId = `${templateId}_face_${i}`
+    const rekFaceId = await indexFaceIntoCollection(collectionId, cropped, externalId)
+
+    if (rekFaceId && mergedFaces[i]) {
+      mergedFaces[i].rekognitionFaceId = rekFaceId
+      allIndexedFaces.push({
+        rekognitionFaceId: rekFaceId,
+        templateId,
+        faceIndex: i,
+        face: mergedFaces[i],
+      })
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Step 8b: Identity-based clustering using Rekognition SearchFaces
+// ---------------------------------------------------------------------------
+async function clusterByIdentity(
+  collectionId: string,
   photos: PhotoFixture[]
-): PersonClusterFixture[] {
-  const roleMap = new Map<
-    string,
-    { templateIds: Set<string>; face: PersonFace }
-  >()
+): Promise<PersonClusterFixture[]> {
+  if (allIndexedFaces.length === 0) return []
 
-  for (const photo of photos) {
-    for (const face of photo.analysis.faceData) {
-      const role = face.role?.toLowerCase()
-      if (!role) continue
+  // Union-Find for grouping faces
+  const parent = new Map<string, string>()
+  function find(id: string): string {
+    if (!parent.has(id)) parent.set(id, id)
+    if (parent.get(id) !== id) parent.set(id, find(parent.get(id)!))
+    return parent.get(id)!
+  }
+  function union(a: string, b: string) {
+    const ra = find(a), rb = find(b)
+    if (ra !== rb) parent.set(ra, rb)
+  }
 
-      const existing = roleMap.get(role)
-      if (existing) {
-        existing.templateIds.add(photo.templateId)
-      } else {
-        roleMap.set(role, {
-          templateIds: new Set([photo.templateId]),
-          face,
+  // Search for matches for each indexed face
+  console.log(`\nClustering ${allIndexedFaces.length} indexed faces...`)
+  for (const entry of allIndexedFaces) {
+    try {
+      const res = await rekognition.send(
+        new SearchFacesCommand({
+          CollectionId: collectionId,
+          FaceId: entry.rekognitionFaceId,
+          FaceMatchThreshold: 80,
+          MaxFaces: 100,
         })
+      )
+
+      for (const match of res.FaceMatches ?? []) {
+        if (match.Face?.FaceId) {
+          union(entry.rekognitionFaceId, match.Face.FaceId)
+        }
       }
+    } catch (error) {
+      console.warn(`  SearchFaces failed for ${entry.rekognitionFaceId}:`,
+        error instanceof Error ? error.message : error)
     }
   }
 
-  // Only create clusters for roles appearing in 2+ photos
-  return Array.from(roleMap.entries())
-    .filter(([, v]) => v.templateIds.size >= 2)
-    .map(([role, v]) => ({
-      templatePhotoIds: Array.from(v.templateIds),
+  // Group faces by cluster root
+  const clusterMap = new Map<string, IndexedFaceEntry[]>()
+  for (const entry of allIndexedFaces) {
+    const root = find(entry.rekognitionFaceId)
+    const group = clusterMap.get(root) || []
+    group.push(entry)
+    clusterMap.set(root, group)
+  }
+
+  // Build PersonClusterFixture for clusters appearing in 2+ photos
+  const clusters: PersonClusterFixture[] = []
+  for (const [, entries] of clusterMap) {
+    const templateIds = [...new Set(entries.map((e) => e.templateId))]
+    if (templateIds.length < 2) continue
+
+    // Determine most common role
+    const roleCounts = new Map<string, number>()
+    for (const e of entries) {
+      const role = e.face.role?.toLowerCase()
+      if (role) roleCounts.set(role, (roleCounts.get(role) || 0) + 1)
+    }
+    const topRole = roleCounts.size > 0
+      ? [...roleCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+      : null
+
+    const representative = entries[0].face
+
+    clusters.push({
+      templatePhotoIds: templateIds,
       name: null,
-      role,
-      description: v.face.appearance,
-      faceDescription: v.face.appearance,
-    }))
+      role: topRole,
+      description: representative.appearance,
+      faceDescription: representative.appearance,
+    })
+  }
+
+  console.log(`  Found ${clusterMap.size} unique faces, ${clusters.length} appearing in 2+ photos`)
+  return clusters
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +606,14 @@ async function main() {
     console.error("No image files found!")
     process.exit(1)
   }
+
+  // Create a temporary Rekognition collection for face identity clustering
+  const COLLECTION_ID = "demo-gallery-prep"
+  console.log(`Creating Rekognition collection: ${COLLECTION_ID}`)
+  try {
+    await rekognition.send(new DeleteCollectionCommand({ CollectionId: COLLECTION_ID }))
+  } catch { /* ignore if doesn't exist */ }
+  await rekognition.send(new CreateCollectionCommand({ CollectionId: COLLECTION_ID }))
 
   // Process each photo
   const photoFixtures: PhotoFixture[] = []
@@ -525,6 +680,13 @@ async function main() {
 
         // Merge faces
         const people = mergeFaces(cvFaces, analysisResult.people || [])
+
+        // Index faces into Rekognition collection for identity clustering
+        if (cvFaces.length > 0) {
+          await indexPhotoFaces(COLLECTION_ID, jpegBuffer, templateId, cvFaces, people)
+          console.log(`    Indexed ${people.filter(p => p.rekognitionFaceId).length}/${cvFaces.length} faces`)
+        }
+
         const searchTags = extractSearchTags(analysisResult, people)
 
         console.log(
@@ -576,9 +738,15 @@ async function main() {
   // Sort by order
   photoFixtures.sort((a, b) => a.order - b.order)
 
-  // Step 3: Cluster persons by role
-  const personClusters = clusterByRole(photoFixtures)
+  // Step 3: Cluster persons by face identity using Rekognition
+  const personClusters = await clusterByIdentity(COLLECTION_ID, photoFixtures)
   console.log(`Created ${personClusters.length} person clusters`)
+
+  // Clean up temporary collection
+  console.log(`Deleting temporary Rekognition collection: ${COLLECTION_ID}`)
+  try {
+    await rekognition.send(new DeleteCollectionCommand({ CollectionId: COLLECTION_ID }))
+  } catch { /* ignore */ }
 
   // Step 4: Build and write fixture
   const fixture: DemoFixture = {
