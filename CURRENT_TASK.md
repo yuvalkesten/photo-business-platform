@@ -2,7 +2,25 @@
 
 ## Status: COMPLETED
 
-## Recent: Hybrid CV + LLM Face Detection (AWS Rekognition)
+## Recent: Print Store Feature (Feb 14, 2026)
+Full print store implementation for selling physical products (prints, canvas, framed prints) directly from client galleries. Uses Prodigi for fulfillment and Stripe for payments.
+
+### What was built:
+1. **Database**: PriceSheet, PriceSheetItem, StoreOrder, StoreOrderItem models + StoreProductCategory/StoreOrderStatus enums
+2. **Prodigi client** (`src/lib/prodigi/`): products, orders, quotes, webhooks, submit-order
+3. **Stripe client** (`src/lib/stripe/`): checkout sessions, webhook verification (lazy init for build safety)
+4. **Cart store** (`src/stores/cart-store.ts`): Zustand + localStorage persistence
+5. **Dashboard**: Store overview, settings, price sheet CRUD with Prodigi catalog browser, gallery store toggle
+6. **Public gallery**: Store tab, Buy Print button in lightbox, cart drawer with shipping form → Stripe Checkout
+7. **Checkout flow**: Price validation against price sheet, StoreOrder creation, Stripe Checkout Session
+8. **Webhooks**: Stripe (payment → Prodigi submission) + Prodigi (status updates, tracking)
+9. **Order management**: Orders list with earnings, order detail with financials/timeline, cancel+refund
+
+### New env vars needed:
+- `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
+- `PRODIGI_API_KEY`, `PRODIGI_SANDBOX_API_KEY`, `PRODIGI_WEBHOOK_SECRET`
+
+## Previous: Hybrid CV + LLM Face Detection (AWS Rekognition)
 Replaced pure-LLM face detection/clustering with AWS Rekognition CV backbone:
 - **Rekognition DetectFaces** for precise bounding boxes (confidence-filtered ≥70%)
 - **Rekognition IndexFaces/SearchFaces** for visual similarity clustering (no more LLM text matching)
