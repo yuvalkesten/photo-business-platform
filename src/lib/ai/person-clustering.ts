@@ -9,6 +9,10 @@ interface FaceEntry {
   faceIndex: number
 }
 
+// Similarity threshold for Rekognition face matching.
+// Higher = fewer false positives (better for events with similar-looking people).
+const FACE_MATCH_THRESHOLD = 90
+
 export async function clusterPersons(galleryId: string): Promise<void> {
   // Delete existing clusters for this gallery
   await prisma.personCluster.deleteMany({ where: { galleryId } })
@@ -50,6 +54,27 @@ export async function clusterPersons(galleryId: string): Promise<void> {
   await assignClusterIdsToFaces(galleryId)
 }
 
+// ---------------------------------------------------------------------------
+// Union-Find data structure for identity-based clustering
+// ---------------------------------------------------------------------------
+function createUnionFind() {
+  const parent = new Map<string, string>()
+
+  function find(id: string): string {
+    if (!parent.has(id)) parent.set(id, id)
+    if (parent.get(id) !== id) parent.set(id, find(parent.get(id)!))
+    return parent.get(id)!
+  }
+
+  function union(a: string, b: string) {
+    const ra = find(a)
+    const rb = find(b)
+    if (ra !== rb) parent.set(ra, rb)
+  }
+
+  return { find, union }
+}
+
 async function clusterWithRekognition(
   galleryId: string,
   collectionId: string,
@@ -63,60 +88,51 @@ async function clusterWithRekognition(
     }
   }
 
-  const visited = new Set<string>()
-  const clusters: Array<{
-    entries: FaceEntry[]
-    rekFaceIds: string[]
-    representativeFaceId: string
-  }> = []
+  // Use Union-Find to build connected components from Rekognition matches.
+  // Unlike greedy single-pass, every face searches independently so we get
+  // the full match graph before grouping.
+  const uf = createUnionFind()
+  const indexedFaceIds = [...rekIdToEntry.keys()]
 
-  // For each unvisited face with a rekognitionFaceId, search for matches
-  for (const entry of allFaces) {
-    const rekFaceId = entry.face.rekognitionFaceId
-    if (!rekFaceId || visited.has(rekFaceId)) continue
-
-    visited.add(rekFaceId)
-
-    let matches: Array<{ faceId: string; similarity: number }> = []
+  for (const rekFaceId of indexedFaceIds) {
     try {
-      matches = await searchFacesById(collectionId, rekFaceId, 80)
+      const matches = await searchFacesById(collectionId, rekFaceId, FACE_MATCH_THRESHOLD)
+      for (const match of matches) {
+        // Only union with faces we know about (in our gallery's analysis data)
+        if (rekIdToEntry.has(match.faceId)) {
+          uf.union(rekFaceId, match.faceId)
+        }
+      }
     } catch (error) {
       console.warn(`SearchFaces failed for ${rekFaceId}:`,
         error instanceof Error ? error.message : error)
-      continue
     }
+  }
 
-    // Build cluster from this face + all matches
-    const clusterEntries: FaceEntry[] = [entry]
-    const clusterRekIds: string[] = [rekFaceId]
+  // Group faces by their cluster root
+  const clusterMap = new Map<string, FaceEntry[]>()
+  const clusterRekIds = new Map<string, string[]>()
 
-    for (const match of matches) {
-      if (visited.has(match.faceId)) continue
-      visited.add(match.faceId)
+  for (const rekFaceId of indexedFaceIds) {
+    const root = uf.find(rekFaceId)
+    const entry = rekIdToEntry.get(rekFaceId)!
 
-      const matchEntry = rekIdToEntry.get(match.faceId)
-      if (matchEntry) {
-        clusterEntries.push(matchEntry)
-        clusterRekIds.push(match.faceId)
-      }
+    if (!clusterMap.has(root)) {
+      clusterMap.set(root, [])
+      clusterRekIds.set(root, [])
     }
-
-    clusters.push({
-      entries: clusterEntries,
-      rekFaceIds: clusterRekIds,
-      representativeFaceId: rekFaceId,
-    })
+    clusterMap.get(root)!.push(entry)
+    clusterRekIds.get(root)!.push(rekFaceId)
   }
 
   // Create PersonCluster records
-  for (const cluster of clusters) {
-    if (cluster.entries.length < 1) continue
-
-    const photoIds = [...new Set(cluster.entries.map((e) => e.photoId))]
+  for (const [root, entries] of clusterMap) {
+    const photoIds = [...new Set(entries.map((e) => e.photoId))]
+    const rekFaceIds = clusterRekIds.get(root) || []
 
     // Determine role from most common LLM-assigned role
     const roleCounts = new Map<string, number>()
-    for (const e of cluster.entries) {
+    for (const e of entries) {
       const role = e.face.role?.toLowerCase()
       if (role) {
         roleCounts.set(role, (roleCounts.get(role) || 0) + 1)
@@ -126,7 +142,7 @@ async function clusterWithRekognition(
       ? [...roleCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
       : null
 
-    const representative = cluster.entries[0].face
+    const representative = entries[0].face
 
     await prisma.personCluster.create({
       data: {
@@ -135,8 +151,8 @@ async function clusterWithRekognition(
         role: topRole,
         photoIds,
         faceDescription: representative.appearance,
-        rekognitionFaceIds: cluster.rekFaceIds,
-        representativeFaceId: cluster.representativeFaceId,
+        rekognitionFaceIds: rekFaceIds,
+        representativeFaceId: root,
       },
     })
   }
@@ -152,16 +168,15 @@ async function clusterByRole(
   galleryId: string,
   faces: FaceEntry[]
 ): Promise<void> {
+  // Group all faces by their LLM-assigned role
   const roleClusters = new Map<string, FaceEntry[]>()
-  const keyRoles = new Set(["bride", "groom", "officiant"])
 
   for (const entry of faces) {
     const role = entry.face.role?.toLowerCase()
-    if (role && keyRoles.has(role)) {
-      const existing = roleClusters.get(role) || []
-      existing.push(entry)
-      roleClusters.set(role, existing)
-    }
+    if (!role) continue
+    const existing = roleClusters.get(role) || []
+    existing.push(entry)
+    roleClusters.set(role, existing)
   }
 
   for (const [role, entries] of roleClusters) {

@@ -144,6 +144,7 @@ interface PhotoFixture {
 }
 
 interface PersonClusterFixture {
+  fixtureClusterId: string
   templatePhotoIds: string[]
   name: string | null
   role: string | null
@@ -552,9 +553,12 @@ async function clusterByIdentity(
 
   // Build PersonClusterFixture for clusters appearing in 2+ photos
   const clusters: PersonClusterFixture[] = []
+  let clusterIdx = 0
   for (const [, entries] of clusterMap) {
     const templateIds = [...new Set(entries.map((e) => e.templateId))]
     if (templateIds.length < 2) continue
+
+    const fixtureClusterId = `cluster_${clusterIdx++}`
 
     // Determine most common role
     const roleCounts = new Map<string, number>()
@@ -568,7 +572,13 @@ async function clusterByIdentity(
 
     const representative = entries[0].face
 
+    // Assign fixtureClusterId to each face in the cluster's entries
+    for (const entry of entries) {
+      entry.face.personClusterId = fixtureClusterId
+    }
+
     clusters.push({
+      fixtureClusterId,
       templatePhotoIds: templateIds,
       name: null,
       role: topRole,

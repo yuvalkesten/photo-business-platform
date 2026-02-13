@@ -55,6 +55,7 @@ interface DemoFixture {
     }
   }>
   personClusters: Array<{
+    fixtureClusterId: string
     templatePhotoIds: string[]
     name: string | null
     role: string | null
@@ -242,7 +243,8 @@ export async function seedDemoData(userId: string): Promise<void> {
     console.error("Demo seeding: PhotoAnalysis creation failed:", error)
   }
 
-  // 6. Create PersonCluster records
+  // 6. Create PersonCluster records and build fixtureClusterId → real ID map
+  const fixtureClusterToRealId = new Map<string, string>()
   try {
     for (const cluster of fixture.personClusters) {
       const photoIds = cluster.templatePhotoIds
@@ -251,7 +253,7 @@ export async function seedDemoData(userId: string): Promise<void> {
 
       if (photoIds.length === 0) continue
 
-      await prisma.personCluster.create({
+      const created = await prisma.personCluster.create({
         data: {
           galleryId: gallery.id,
           name: cluster.name,
@@ -261,10 +263,55 @@ export async function seedDemoData(userId: string): Promise<void> {
           photoIds,
         },
       })
+      fixtureClusterToRealId.set(cluster.fixtureClusterId, created.id)
     }
   } catch (error) {
     // Non-fatal
     console.error("Demo seeding: PersonCluster creation failed:", error)
+  }
+
+  // 6b. Assign personClusterId on faceData so PeopleRow can match faces to clusters
+  if (fixtureClusterToRealId.size > 0) {
+    try {
+      const analyses = await prisma.photoAnalysis.findMany({
+        where: { galleryId: gallery.id },
+        select: { photoId: true, faceData: true },
+      })
+
+      for (const analysis of analyses) {
+        const faces = analysis.faceData as unknown as Array<{
+          personClusterId?: string
+          [key: string]: unknown
+        }> | null
+        if (!faces) continue
+
+        let updated = false
+        for (const face of faces) {
+          if (
+            face.personClusterId &&
+            fixtureClusterToRealId.has(face.personClusterId)
+          ) {
+            face.personClusterId = fixtureClusterToRealId.get(
+              face.personClusterId
+            )!
+            updated = true
+          }
+        }
+
+        if (updated) {
+          await prisma.photoAnalysis.update({
+            where: { photoId: analysis.photoId },
+            data: {
+              faceData: JSON.parse(
+                JSON.stringify(faces)
+              ) as Prisma.InputJsonValue,
+            },
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Demo seeding: faceData cluster assignment failed:", error)
+    }
   }
 
   // 7. Set gallery cover image from first photo

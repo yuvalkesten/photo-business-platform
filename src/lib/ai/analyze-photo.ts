@@ -32,28 +32,45 @@ export async function analyzePhoto(
       throw new PhotoAnalysisError("Photo not found", "IMAGE_ERROR")
     }
 
-    const imageUrl = photo.thumbnailUrl || getS3Url(photo.s3Key)
-    const response = await fetch(imageUrl)
-    if (!response.ok) {
-      throw new PhotoAnalysisError(`Failed to fetch image: ${response.status}`, "IMAGE_ERROR")
+    // Use full-resolution image for face detection/indexing (thumbnails produce
+    // low-quality Rekognition embeddings that cause false-positive matches).
+    // Use thumbnail for Gemini Vision analysis (scene understanding doesn't need high res).
+    const fullImageUrl = getS3Url(photo.s3Key)
+    const fullResponse = await fetch(fullImageUrl)
+    if (!fullResponse.ok) {
+      throw new PhotoAnalysisError(`Failed to fetch image: ${fullResponse.status}`, "IMAGE_ERROR")
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer())
+    const fullBuffer = Buffer.from(await fullResponse.arrayBuffer())
     const mimeType = photo.mimeType.startsWith("image/") ? photo.mimeType : "image/jpeg"
 
-    // === STAGE 1: CV Face Detection ===
+    // === STAGE 1: CV Face Detection (uses full-res for accurate bounding boxes) ===
     let cvFaces: CVDetectedFace[] = []
     try {
-      cvFaces = await detectFacesInImage(buffer)
+      cvFaces = await detectFacesInImage(fullBuffer)
     } catch (error) {
       // Non-fatal: fall back to LLM-only detection
       console.warn(`CV face detection failed for ${photoId}, falling back to LLM:`,
         error instanceof Error ? error.message : error)
     }
 
-    // === STAGE 2: LLM Annotation ===
+    // === STAGE 2: LLM Annotation (uses thumbnail if available to save bandwidth) ===
+    let geminiBuffer: Buffer
+    if (photo.thumbnailUrl) {
+      try {
+        const thumbResponse = await fetch(photo.thumbnailUrl)
+        geminiBuffer = thumbResponse.ok
+          ? Buffer.from(await thumbResponse.arrayBuffer())
+          : fullBuffer
+      } catch {
+        geminiBuffer = fullBuffer
+      }
+    } else {
+      geminiBuffer = fullBuffer
+    }
+
     const prompt = buildHybridPrompt(cvFaces)
-    const base64 = buffer.toString("base64")
+    const base64 = geminiBuffer.toString("base64")
     const rawResponse = await analyzePhotoWithGemini(base64, mimeType, prompt)
 
     // Parse JSON response
@@ -71,10 +88,10 @@ export async function analyzePhoto(
     // Merge CV data into LLM people results
     const people = mergeCVAndLLMFaces(cvFaces, analysisResult.people || [])
 
-    // === STAGE 3: Face Indexing into Rekognition collection ===
+    // === STAGE 3: Face Indexing into Rekognition collection (uses full-res for quality) ===
     if (collectionId && cvFaces.length > 0) {
       try {
-        const indexed = await indexDetectedFaces(collectionId, buffer, photoId, cvFaces)
+        const indexed = await indexDetectedFaces(collectionId, fullBuffer, photoId, cvFaces)
         // Write rekognitionFaceId back into the people array
         for (const result of indexed) {
           const matchingPerson = people[result.cvFaceIndex]
