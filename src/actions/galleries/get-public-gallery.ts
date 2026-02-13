@@ -70,6 +70,26 @@ export async function getPublicGallery(shareToken: string, password?: string, by
             faceDescription: true,
           },
         },
+        priceSheet: {
+          select: {
+            isActive: true,
+            items: {
+              orderBy: [
+                { productCategory: "asc" },
+                { retailPrice: "asc" },
+              ],
+              select: {
+                id: true,
+                prodigiSku: true,
+                productCategory: true,
+                productName: true,
+                sizeLabel: true,
+                retailPrice: true,
+                currency: true,
+              },
+            },
+          },
+        },
       },
     })
 
@@ -138,6 +158,20 @@ export async function getPublicGallery(shareToken: string, password?: string, by
         favoriteLimit: gallery.favoriteLimit,
         // AI Search
         aiSearchEnabled: gallery.aiSearchEnabled,
+        // Store
+        storeEnabled: gallery.storeEnabled && gallery.priceSheet?.isActive === true,
+        storeProducts:
+          gallery.storeEnabled && gallery.priceSheet?.isActive
+            ? gallery.priceSheet.items.map((item) => ({
+                id: item.id,
+                prodigiSku: item.prodigiSku,
+                productCategory: item.productCategory,
+                productName: item.productName,
+                sizeLabel: item.sizeLabel,
+                retailPrice: Number(item.retailPrice),
+                currency: item.currency,
+              }))
+            : [],
         // Content
         photos: publicPhotos,
         photoSets: gallery.photoSets,

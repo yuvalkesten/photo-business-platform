@@ -21,6 +21,8 @@ import {
   Info,
   ArrowLeft,
   Search,
+  ShoppingBag,
+  ShoppingCart,
 } from "lucide-react"
 import { ShareButtons } from "./ShareButtons"
 import { FavoritesBar } from "./FavoritesBar"
@@ -32,6 +34,11 @@ import { PeopleRow } from "./PeopleRow"
 import { createFavoriteList } from "@/actions/galleries/create-favorite-list"
 import { toggleFavorite } from "@/actions/galleries/toggle-favorite"
 import { GALLERY_THEMES, GALLERY_FONTS, type GalleryTheme, type GalleryFont } from "@/lib/gallery-themes"
+import { ProductPicker, type StoreProduct } from "@/components/features/store/ProductPicker"
+import { BuyPrintButton } from "@/components/features/store/BuyPrintButton"
+import { CartDrawer } from "@/components/features/store/CartDrawer"
+import { StoreTab } from "@/components/features/store/StoreTab"
+import { useCartStore } from "@/stores/cart-store"
 
 interface PhotoAnalysisData {
   searchTags: string[]
@@ -90,6 +97,9 @@ interface GalleryData {
   favoriteLimit?: number | null
   // AI Search
   aiSearchEnabled?: boolean
+  // Store
+  storeEnabled?: boolean
+  storeProducts?: StoreProduct[]
   // Content
   photos: Photo[]
   photoSets?: PhotoSet[]
@@ -130,6 +140,12 @@ export function GalleryView({ gallery }: GalleryViewProps) {
   } | null>(null)
   const [activeSetId, setActiveSetId] = useState<string | null>(null)
   const [showSearchPanel, setShowSearchPanel] = useState(false)
+  const [showProductPicker, setShowProductPicker] = useState(false)
+  const [showCartDrawer, setShowCartDrawer] = useState(false)
+  const [activeView, setActiveView] = useState<"photos" | "store">("photos")
+  const cartItemCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.quantity, 0))
+
+  const storeEnabled = gallery.storeEnabled && (gallery.storeProducts?.length ?? 0) > 0
 
   const theme = (gallery.theme || "classic") as GalleryTheme
   const themeVars = GALLERY_THEMES[theme]?.vars || GALLERY_THEMES.classic.vars
@@ -506,29 +522,68 @@ export function GalleryView({ gallery }: GalleryViewProps) {
               )}
             </div>
 
-            {/* Center: Photo set tabs (desktop) */}
-            {hasPhotoSets && !selectedPerson && !searchResults && (
+            {/* Center: Photo set tabs + store tab (desktop) */}
+            {!selectedPerson && !searchResults && (
               <nav className="hidden md:flex items-center gap-1">
-                <TabButton
-                  active={activeSetId === null}
-                  onClick={() => setActiveSetId(null)}
-                >
-                  ALL
-                </TabButton>
-                {gallery.photoSets!.map((set) => (
+                {storeEnabled && (
                   <TabButton
-                    key={set.id}
-                    active={activeSetId === set.id}
-                    onClick={() => setActiveSetId(set.id)}
+                    active={activeView === "photos"}
+                    onClick={() => setActiveView("photos")}
                   >
-                    {set.name.toUpperCase()}
+                    PHOTOS
                   </TabButton>
-                ))}
+                )}
+                {hasPhotoSets && activeView === "photos" && (
+                  <>
+                    <TabButton
+                      active={activeSetId === null && activeView === "photos"}
+                      onClick={() => { setActiveSetId(null); setActiveView("photos") }}
+                    >
+                      ALL
+                    </TabButton>
+                    {gallery.photoSets!.map((set) => (
+                      <TabButton
+                        key={set.id}
+                        active={activeSetId === set.id}
+                        onClick={() => { setActiveSetId(set.id); setActiveView("photos") }}
+                      >
+                        {set.name.toUpperCase()}
+                      </TabButton>
+                    ))}
+                  </>
+                )}
+                {storeEnabled && (
+                  <TabButton
+                    active={activeView === "store"}
+                    onClick={() => setActiveView("store")}
+                  >
+                    STORE
+                  </TabButton>
+                )}
               </nav>
             )}
 
             {/* Right: Icon action buttons */}
             <div className="flex items-center gap-0.5">
+              {storeEnabled && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 relative"
+                  onClick={() => setShowCartDrawer(true)}
+                  style={{ color: themeVars["--gallery-text"] }}
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  {cartItemCount > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full text-[10px] font-bold flex items-center justify-center text-white px-1"
+                      style={{ backgroundColor: accentColor }}
+                    >
+                      {cartItemCount}
+                    </span>
+                  )}
+                </Button>
+              )}
               {gallery.aiSearchEnabled && (
                 <Button
                   variant="ghost"
@@ -585,26 +640,46 @@ export function GalleryView({ gallery }: GalleryViewProps) {
           </div>
 
           {/* Mobile tabs row */}
-          {hasPhotoSets && !selectedPerson && !searchResults && (
+          {!selectedPerson && !searchResults && (storeEnabled || hasPhotoSets) && (
             <div
               className="md:hidden overflow-x-auto flex gap-1 pb-2 -mx-4 px-4"
               style={{ scrollbarWidth: "none" }}
             >
-              <TabButton
-                active={activeSetId === null}
-                onClick={() => setActiveSetId(null)}
-              >
-                ALL
-              </TabButton>
-              {gallery.photoSets!.map((set) => (
+              {storeEnabled && (
                 <TabButton
-                  key={set.id}
-                  active={activeSetId === set.id}
-                  onClick={() => setActiveSetId(set.id)}
+                  active={activeView === "photos"}
+                  onClick={() => setActiveView("photos")}
                 >
-                  {set.name.toUpperCase()}
+                  PHOTOS
                 </TabButton>
-              ))}
+              )}
+              {hasPhotoSets && activeView === "photos" && (
+                <>
+                  <TabButton
+                    active={activeSetId === null}
+                    onClick={() => setActiveSetId(null)}
+                  >
+                    ALL
+                  </TabButton>
+                  {gallery.photoSets!.map((set) => (
+                    <TabButton
+                      key={set.id}
+                      active={activeSetId === set.id}
+                      onClick={() => setActiveSetId(set.id)}
+                    >
+                      {set.name.toUpperCase()}
+                    </TabButton>
+                  ))}
+                </>
+              )}
+              {storeEnabled && (
+                <TabButton
+                  active={activeView === "store"}
+                  onClick={() => setActiveView("store")}
+                >
+                  STORE
+                </TabButton>
+              )}
             </div>
           )}
 
@@ -725,9 +800,17 @@ export function GalleryView({ gallery }: GalleryViewProps) {
         </div>
       )}
 
-      {/* Gallery Grid */}
+      {/* Gallery Grid or Store Tab */}
       <main className="container max-w-7xl mx-auto px-4 pb-24">
-        {displayPhotos.length === 0 ? (
+        {activeView === "store" && storeEnabled ? (
+          <StoreTab
+            photos={gallery.photos}
+            products={gallery.storeProducts || []}
+            galleryId={gallery.id}
+            themeVars={themeVars}
+            accentColor={accentColor}
+          />
+        ) : displayPhotos.length === 0 ? (
           <div className="text-center py-20">
             <Camera className="h-16 w-16 mx-auto mb-4" style={{ color: themeVars["--gallery-muted"] }} />
             <h2 className="text-xl font-semibold mb-2">
@@ -816,6 +899,31 @@ export function GalleryView({ gallery }: GalleryViewProps) {
         />
       )}
 
+      {/* Product Picker (lightbox Buy Print) */}
+      {storeEnabled && selectedPhoto !== null && (
+        <ProductPicker
+          open={showProductPicker}
+          onOpenChange={setShowProductPicker}
+          photo={gallery.photos[selectedPhoto]}
+          products={gallery.storeProducts || []}
+          galleryId={gallery.id}
+          themeVars={themeVars}
+          accentColor={accentColor}
+        />
+      )}
+
+      {/* Cart Drawer */}
+      {storeEnabled && (
+        <CartDrawer
+          open={showCartDrawer}
+          onOpenChange={setShowCartDrawer}
+          galleryId={gallery.id}
+          shareToken={gallery.shareToken || ""}
+          themeVars={themeVars}
+          accentColor={accentColor}
+        />
+      )}
+
       {/* Lightbox */}
       <Dialog open={selectedPhoto !== null} onOpenChange={() => closeLightbox()}>
         <DialogContent
@@ -896,6 +1004,12 @@ export function GalleryView({ gallery }: GalleryViewProps) {
                         <Info className="h-4 w-4 mr-2" />
                         Info
                       </Button>
+                    )}
+                    {/* Buy Print button in lightbox */}
+                    {storeEnabled && (
+                      <BuyPrintButton
+                        onClick={() => setShowProductPicker(true)}
+                      />
                     )}
                     {/* Favorite button in lightbox */}
                     <Button
