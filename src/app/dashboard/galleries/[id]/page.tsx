@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { requireAuth } from "@/lib/auth/utils"
+import { prisma } from "@/lib/db"
 import { getGallery, getGalleryVisitors, getFavoriteLists, getDownloadStats } from "@/actions/galleries"
 import { deleteGallery } from "@/actions/galleries/delete-gallery"
 import { Button } from "@/components/ui/button"
@@ -35,6 +36,7 @@ import { QRCodeCard } from "@/components/features/galleries/QRCodeCard"
 import { DownloadStats } from "@/components/features/galleries/DownloadStats"
 import { AIAnalysisCard } from "@/components/features/galleries/AIAnalysisCard"
 import { PersonClustersCard } from "@/components/features/galleries/PersonClustersCard"
+import { GalleryStoreCard } from "@/components/features/store/GalleryStoreCard"
 
 interface GalleryDetailPageProps {
   params: Promise<{ id: string }>
@@ -57,6 +59,13 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
   const favoritesResult = await getFavoriteLists(id)
   const favoriteLists = favoritesResult.lists || []
   const downloadStatsResult = await getDownloadStats(id)
+
+  // Fetch price sheets for store card
+  const priceSheets = await prisma.priceSheet.findMany({
+    where: { userId: user.id, isActive: true },
+    select: { id: true, name: true, isDefault: true, _count: { select: { items: true } } },
+    orderBy: { isDefault: "desc" },
+  })
   // Use NEXTAUTH_URL for production, fall back to NEXT_PUBLIC_APP_URL or localhost
   const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   const shareUrl = `${baseUrl}/gallery/${gallery.shareToken}`
@@ -173,6 +182,19 @@ export default async function GalleryDetailPage({ params }: GalleryDetailPagePro
           {downloadStatsResult.stats && (
             <DownloadStats stats={downloadStatsResult.stats} />
           )}
+
+          {/* Print Store */}
+          <GalleryStoreCard
+            galleryId={id}
+            storeEnabled={gallery.storeEnabled ?? false}
+            priceSheetId={gallery.priceSheetId ?? null}
+            priceSheets={priceSheets.map((s) => ({
+              id: s.id,
+              name: s.name,
+              isDefault: s.isDefault,
+              itemCount: s._count.items,
+            }))}
+          />
 
           {/* Project Info */}
           <Card>

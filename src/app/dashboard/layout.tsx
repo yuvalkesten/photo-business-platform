@@ -36,6 +36,7 @@ import {
   Search,
   Bell,
   Plus,
+  ShoppingBag,
 } from "lucide-react"
 
 const navigation = [
@@ -49,6 +50,7 @@ const navigation = [
   { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
   { name: "Invoices", href: "/dashboard/invoices", icon: Receipt },
   { name: "Galleries", href: "/dashboard/galleries", icon: ImageIcon },
+  { name: "Print Store", href: "/dashboard/store", icon: ShoppingBag },
 ]
 
 function NavLink({
