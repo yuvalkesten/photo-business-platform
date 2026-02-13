@@ -12,12 +12,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma) as Adapter,
   events: {
-    // Seed demo data for new OAuth users
+    // Seed demo data for new OAuth users (awaited so it completes on Vercel)
     async createUser({ user }) {
       if (user.id) {
-        seedDemoData(user.id).catch((err) =>
+        try {
+          await seedDemoData(user.id)
+        } catch (err) {
           console.error("Demo seeding failed:", user.id, err)
-        )
+        }
       }
     },
     // Update tokens when user signs in again (to get new scopes)

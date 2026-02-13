@@ -27,9 +27,12 @@ export async function register(data: unknown) {
       },
     })
 
-    seedDemoData(user.id).catch((err) =>
+    // Await seeding so it completes before Vercel kills the function
+    try {
+      await seedDemoData(user.id)
+    } catch (err) {
       console.error("Demo seeding failed:", user.id, err)
-    )
+    }
 
     return { success: true }
   } catch (error) {

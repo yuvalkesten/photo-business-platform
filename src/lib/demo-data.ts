@@ -64,14 +64,35 @@ interface DemoFixture {
 }
 
 // ---------------------------------------------------------------------------
-// Main entry point — called fire-and-forget from auth hooks
+// Main entry point — awaited from auth hooks
 // ---------------------------------------------------------------------------
 export async function seedDemoData(userId: string): Promise<void> {
-  // Idempotency: skip if demo project already exists
+  // Idempotency: skip if demo project with photos already exists
   const existing = await prisma.project.findFirst({
     where: { userId, name: fixture.project.name, tags: { has: "demo" } },
+    include: {
+      galleries: { include: { _count: { select: { photos: true } } } },
+    },
   })
-  if (existing) return
+
+  if (existing) {
+    const hasPhotos = existing.galleries.some((g) => g._count.photos > 0)
+    if (hasPhotos) return
+
+    // Broken demo data (project exists but gallery has no photos) — clean up and re-seed
+    for (const gallery of existing.galleries) {
+      await prisma.photoAnalysis.deleteMany({ where: { galleryId: gallery.id } })
+      await prisma.personCluster.deleteMany({ where: { galleryId: gallery.id } })
+      await prisma.photo.deleteMany({ where: { galleryId: gallery.id } })
+      await prisma.gallery.delete({ where: { id: gallery.id } })
+    }
+    await prisma.project.delete({ where: { id: existing.id } })
+    if (existing.contactId) {
+      await prisma.contact.delete({ where: { id: existing.contactId } }).catch(() => {
+        // Contact may be referenced elsewhere
+      })
+    }
+  }
 
   // 1. Create Contact
   const contact = await prisma.contact.create({
