@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,9 +12,11 @@ import { updateStoreSettings } from "@/actions/store/update-store-settings"
 interface StoreSettingsProps {
   storeEnabled: boolean
   defaultMarkupPercent: number
+  hasPriceSheets: boolean
 }
 
-export function StoreSettings({ storeEnabled, defaultMarkupPercent }: StoreSettingsProps) {
+export function StoreSettings({ storeEnabled, defaultMarkupPercent, hasPriceSheets }: StoreSettingsProps) {
+  const router = useRouter()
   const [enabled, setEnabled] = useState(storeEnabled)
   const [markup, setMarkup] = useState(defaultMarkupPercent)
   const [saving, setSaving] = useState(false)
@@ -25,6 +28,7 @@ export function StoreSettings({ storeEnabled, defaultMarkupPercent }: StoreSetti
       defaultMarkupPercent: markup,
     })
     setSaving(false)
+    router.refresh()
   }
 
   return (
@@ -49,6 +53,13 @@ export function StoreSettings({ storeEnabled, defaultMarkupPercent }: StoreSetti
             onCheckedChange={setEnabled}
           />
         </div>
+
+        {enabled && !hasPriceSheets && (
+          <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+            A default price sheet with popular products will be created automatically when you save,
+            and the store will be enabled on all your galleries.
+          </p>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="default-markup">Default Markup (%)</Label>

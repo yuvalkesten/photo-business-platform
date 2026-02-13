@@ -10,10 +10,13 @@ export default async function StoreSettingsPage() {
   const user = await requireAuth()
   if (!user) redirect("/auth/signin")
 
-  const fullUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { storeEnabled: true, defaultMarkupPercent: true },
-  })
+  const [fullUser, priceSheetCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { storeEnabled: true, defaultMarkupPercent: true },
+    }),
+    prisma.priceSheet.count({ where: { userId: user.id } }),
+  ])
 
   return (
     <div className="p-6 space-y-6">
@@ -35,6 +38,7 @@ export default async function StoreSettingsPage() {
         <StoreSettings
           storeEnabled={fullUser?.storeEnabled ?? false}
           defaultMarkupPercent={fullUser?.defaultMarkupPercent ?? 50}
+          hasPriceSheets={priceSheetCount > 0}
         />
       </div>
     </div>
