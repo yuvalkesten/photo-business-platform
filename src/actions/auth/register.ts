@@ -3,6 +3,7 @@
 import { hash } from "bcryptjs"
 import { prisma } from "@/lib/db"
 import { signUpSchema } from "@/lib/validations/auth.schema"
+import { seedDemoData } from "@/lib/demo-data"
 
 export async function register(data: unknown) {
   try {
@@ -18,13 +19,17 @@ export async function register(data: unknown) {
 
     const hashedPassword = await hash(validated.password, 12)
 
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         name: validated.name,
         email: validated.email,
         password: hashedPassword,
       },
     })
+
+    seedDemoData(user.id).catch((err) =>
+      console.error("Demo seeding failed:", user.id, err)
+    )
 
     return { success: true }
   } catch (error) {

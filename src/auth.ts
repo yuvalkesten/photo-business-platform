@@ -5,12 +5,21 @@ import { prisma } from "@/lib/prisma/client"
 import { compare } from "bcryptjs"
 import type { Adapter } from "next-auth/adapters"
 import { authConfig } from "@/lib/auth/auth.config"
+import { seedDemoData } from "@/lib/demo-data"
 
 // Full auth config with Prisma adapter (used in API routes, not middleware)
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(prisma) as Adapter,
   events: {
+    // Seed demo data for new OAuth users
+    async createUser({ user }) {
+      if (user.id) {
+        seedDemoData(user.id).catch((err) =>
+          console.error("Demo seeding failed:", user.id, err)
+        )
+      }
+    },
     // Update tokens when user signs in again (to get new scopes)
     async signIn({ account, user }) {
       if (account?.provider === "google" && user?.id) {

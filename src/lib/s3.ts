@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from "@aws-sdk/client-s3"
+import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, CopyObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 const s3Client = new S3Client({
@@ -54,6 +54,14 @@ export async function uploadBufferToS3(key: string, buffer: Buffer, contentType:
     ContentType: contentType,
   })
   await s3Client.send(command)
+}
+
+export async function copyS3Object(sourceKey: string, destKey: string) {
+  await s3Client.send(new CopyObjectCommand({
+    Bucket: BUCKET_NAME,
+    CopySource: `${BUCKET_NAME}/${sourceKey}`,
+    Key: destKey,
+  }))
 }
 
 export { s3Client, BUCKET_NAME }
