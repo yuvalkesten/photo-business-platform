@@ -42,6 +42,12 @@ model User {
   projects           Project[]
   sessions           Session[]
 
+  // Store
+  storeEnabled         Boolean       @default(false)
+  defaultMarkupPercent Int           @default(50)
+  priceSheets          PriceSheet[]
+  storeOrders          StoreOrder[]
+
   @@map("users")
 }
 
@@ -261,10 +267,17 @@ model Gallery {
   photoAnalyses  PhotoAnalysis[]
   personClusters PersonCluster[]
 
+  // Store
+  storeEnabled   Boolean      @default(false)
+  priceSheetId   String?
+  priceSheet     PriceSheet?  @relation(fields: [priceSheetId], references: [id], onDelete: SetNull)
+  storeOrders    StoreOrder[]
+
   @@index([userId])
   @@index([projectId])
   @@index([contactId])
   @@index([shareToken])
+  @@index([priceSheetId])
   @@map("galleries")
 }
 
@@ -299,10 +312,11 @@ model Photo {
   tags            String[]
   uploadedAt      DateTime        @default(now())
   setId           String?
-  gallery         Gallery         @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-  set             PhotoSet?       @relation(fields: [setId], references: [id], onDelete: SetNull)
+  gallery         Gallery          @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  set             PhotoSet?        @relation(fields: [setId], references: [id], onDelete: SetNull)
   favoritePhotos  FavoritePhoto[]
   analysis        PhotoAnalysis?
+  storeOrderItems StoreOrderItem[]
 
   @@index([galleryId, order])
   @@index([setId])
@@ -696,4 +710,133 @@ model ProcessedMessage {
   @@index([userId, classification])
   @@index([userId, receivedAt])
   @@map("processed_messages")
+}
+
+// =============================================
+// Print Store Models
+// =============================================
+
+enum StoreProductCategory {
+  PRINT
+  CANVAS
+  FRAMED_PRINT
+  METAL_PRINT
+  ACRYLIC
+  PHOTO_BOOK
+}
+
+enum StoreOrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  PRINTED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+  FAILED
+}
+
+model PriceSheet {
+  id        String          @id @default(cuid())
+  userId    String
+  name      String
+  isDefault Boolean         @default(false)
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     PriceSheetItem[]
+  galleries Gallery[]
+
+  @@index([userId])
+  @@map("price_sheets")
+}
+
+model PriceSheetItem {
+  id              String               @id @default(cuid())
+  priceSheetId    String
+  prodigiSku      String
+  productCategory StoreProductCategory
+  productName     String
+  sizeLabel       String
+  prodigiCost     Decimal              @db.Decimal(10, 2)
+  retailPrice     Decimal              @db.Decimal(10, 2)
+  currency        String               @default("USD")
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  priceSheet      PriceSheet           @relation(fields: [priceSheetId], references: [id], onDelete: Cascade)
+
+  @@index([priceSheetId])
+  @@map("price_sheet_items")
+}
+
+model StoreOrder {
+  id                       String           @id @default(cuid())
+  userId                   String
+  galleryId                String
+  orderNumber              String           @unique
+  // Customer info
+  customerEmail            String
+  customerName             String
+  // Stripe
+  stripeCheckoutSessionId  String?          @unique
+  stripePaymentIntentId    String?
+  // Prodigi
+  prodigiOrderId           String?
+  prodigiOrderStatus       String?
+  // Pricing
+  subtotal                 Decimal          @db.Decimal(10, 2)
+  shippingCost             Decimal          @default(0) @db.Decimal(10, 2)
+  taxAmount                Decimal          @default(0) @db.Decimal(10, 2)
+  totalAmount              Decimal          @db.Decimal(10, 2)
+  prodigiCostTotal         Decimal          @default(0) @db.Decimal(10, 2)
+  photographerProfit       Decimal          @default(0) @db.Decimal(10, 2)
+  // Shipping
+  shippingMethod           String?
+  trackingNumber           String?
+  trackingUrl              String?
+  shippingAddress          Json?
+  // Status
+  status                   StoreOrderStatus @default(PENDING_PAYMENT)
+  paidAt                   DateTime?
+  shippedAt                DateTime?
+  deliveredAt              DateTime?
+  cancelledAt              DateTime?
+  refundedAt               DateTime?
+  // Timestamps
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+  // Relations
+  user                     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gallery                  Gallery          @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  items                    StoreOrderItem[]
+
+  @@index([userId])
+  @@index([galleryId])
+  @@index([userId, status])
+  @@index([orderNumber])
+  @@map("store_orders")
+}
+
+model StoreOrderItem {
+  id              String  @id @default(cuid())
+  orderId         String
+  photoId         String?
+  prodigiSku      String
+  productName     String
+  sizeLabel       String
+  quantity        Int
+  unitPrice       Decimal @db.Decimal(10, 2)
+  prodigiUnitCost Decimal @db.Decimal(10, 2)
+  lineTotal       Decimal @db.Decimal(10, 2)
+  printFileUrl    String?
+  prodigiItemId   String?
+
+  order StoreOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  photo Photo?     @relation(fields: [photoId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([photoId])
+  @@map("store_order_items")
 }
