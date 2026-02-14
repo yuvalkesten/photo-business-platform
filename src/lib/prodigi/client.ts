@@ -1,20 +1,10 @@
-const PRODIGI_PROD_BASE_URL = "https://api.prodigi.com/v4.0"
-const PRODIGI_SANDBOX_BASE_URL = "https://api.sandbox.prodigi.com/v4.0"
-
-function getBaseUrl(): string {
-  return process.env.NODE_ENV === "production"
-    ? PRODIGI_PROD_BASE_URL
-    : PRODIGI_SANDBOX_BASE_URL
-}
+const PRODIGI_BASE_URL = "https://api.prodigi.com/v4.0"
 
 function getApiKey(): string {
-  const key =
-    process.env.NODE_ENV === "production"
-      ? process.env.PRODIGI_API_KEY
-      : process.env.PRODIGI_SANDBOX_API_KEY || process.env.PRODIGI_API_KEY
+  const key = process.env.PRODIGI_API_KEY
 
   if (!key) {
-    throw new Error("Prodigi API key not configured")
+    throw new Error("Prodigi API key not configured (PRODIGI_API_KEY)")
   }
   return key
 }
@@ -23,10 +13,9 @@ export async function prodigiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const baseUrl = getBaseUrl()
   const apiKey = getApiKey()
 
-  const response = await fetch(`${baseUrl}${path}`, {
+  const response = await fetch(`${PRODIGI_BASE_URL}${path}`, {
     ...options,
     headers: {
       "X-API-Key": apiKey,

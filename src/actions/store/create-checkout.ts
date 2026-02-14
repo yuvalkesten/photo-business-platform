@@ -20,6 +20,11 @@ export async function createCheckout(data: Record<string, unknown>) {
 
     const validated = checkoutSchema.parse(data)
 
+    // Validate US-only shipping
+    if (validated.shippingAddress.country !== "US") {
+      return { error: "Shipping is currently only available within the United States" }
+    }
+
     // Look up gallery and verify store is enabled
     const gallery = await prisma.gallery.findUnique({
       where: { id: validated.galleryId },

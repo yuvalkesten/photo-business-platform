@@ -41,7 +41,7 @@ export function CartDrawer({
   const [city, setCity] = useState("")
   const [state, setState] = useState("")
   const [postalCode, setPostalCode] = useState("")
-  const [country, setCountry] = useState("US")
+  const country = "US"
   const [error, setError] = useState<string | null>(null)
 
   const subtotal = getSubtotal()
@@ -250,11 +250,9 @@ export function CartDrawer({
                     <Label htmlFor="cart-country" className="text-xs">Country</Label>
                     <Input
                       id="cart-country"
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      placeholder="US"
-                      maxLength={2}
-                      className="h-9"
+                      value="United States"
+                      disabled
+                      className="h-9 bg-muted"
                     />
                   </div>
                 </div>

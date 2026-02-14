@@ -55,7 +55,7 @@ export async function createCheckoutSession(
     mode: "payment",
     customer_email: params.customerEmail,
     line_items: lineItems,
-    automatic_tax: { enabled: true },
+    automatic_tax: { enabled: false },
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
     metadata: {

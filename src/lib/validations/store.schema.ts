@@ -35,7 +35,7 @@ export const shippingAddressSchema = z.object({
   city: z.string().min(1, "City is required"),
   state: z.string().optional(),
   postalCode: z.string().min(1, "Postal/zip code is required"),
-  country: z.string().min(2, "Country is required").max(2),
+  country: z.literal("US", { error: "Only US shipping is available" }),
 })
 
 export const cartItemSchema = z.object({

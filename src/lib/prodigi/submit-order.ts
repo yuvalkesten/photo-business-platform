@@ -47,6 +47,7 @@ export async function submitOrderToProdigi(orderId: string) {
       sku: item.prodigiSku,
       copies: item.quantity,
       sizing: "fillPrintArea" as const,
+      attributes: { finish: "lustre" },
       assets: [
         {
           printArea: "default",

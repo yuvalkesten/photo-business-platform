@@ -799,6 +799,7 @@ model StoreOrder {
   shippingAddress          Json?
   // Status
   status                   StoreOrderStatus @default(PENDING_PAYMENT)
+  failureReason            String?
   paidAt                   DateTime?
   shippedAt                DateTime?
   deliveredAt              DateTime?
