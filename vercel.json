@@ -5,5 +5,13 @@
       "path": "/api/cron/renew-gmail-watches",
       "schedule": "0 2 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/galleries/[id]/analyze/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/galleries/upload/complete/route.ts": {
+      "maxDuration": 120
+    }
+  }
 }
