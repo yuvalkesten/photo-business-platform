@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyStripeWebhook } from "@/lib/stripe/webhooks"
 import { prisma } from "@/lib/db"
 import { submitOrderToProdigi } from "@/lib/prodigi/submit-order"
-import { stripe } from "@/lib/stripe/client"
 import type { Prisma } from "@prisma/client"
 
 export async function POST(request: NextRequest) {
@@ -66,20 +65,9 @@ export async function POST(request: NextRequest) {
             : String(prodigiError)
           console.error("Failed to submit to Prodigi:", errorMessage)
 
-          // Auto-refund the customer since fulfillment failed
-          try {
-            const paymentIntentId = session.payment_intent as string
-            if (paymentIntentId) {
-              await stripe.refunds.create({
-                payment_intent: paymentIntentId,
-              })
-              console.log(`Refund issued for order ${orderId} (PI: ${paymentIntentId})`)
-            }
-          } catch (refundError) {
-            console.error("Failed to issue refund for order", orderId, refundError)
-          }
-
-          // Mark order as FAILED with reason
+          // Mark order as FAILED — do NOT auto-refund because the Prodigi
+          // API call may have succeeded even if our code threw afterward.
+          // The photographer can review and manually refund if needed.
           await prisma.storeOrder.update({
             where: { id: orderId },
             data: {

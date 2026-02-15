@@ -17,6 +17,8 @@ Integrated Prodigi Quote API into checkout flow and fixed all invalid product SK
 7. **Attributes**: Each product type requires specific attributes (photo→finish, canvas→wrap, frame→color). All quote/checkout/order code now uses the shared helper.
 8. **DB migration**: Added `FINE_ART` to `StoreProductCategory` enum.
 9. **Data migration**: Replaced invalid SKUs in existing price sheets (FRM→CFP, MTL→FAP, removed ACR/PHO-11x14-PRO).
+10. **Retail price fix**: Data migration to scale retailPrices proportionally after cost changes (prevents selling below cost).
+11. **Removed auto-refund**: Stripe webhook no longer auto-refunds when Prodigi submission fails — the API call may have succeeded even if our DB update threw. Marks as FAILED for photographer review instead.
 
 ## Previous: Print Store Feature (Feb 14, 2026)
 Full print store implementation for selling physical products (prints, canvas, framed prints) directly from client galleries. Uses Prodigi for fulfillment and Stripe for payments.
