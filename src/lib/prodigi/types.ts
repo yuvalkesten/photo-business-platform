@@ -57,7 +57,7 @@ export interface ProdigiOrderItem {
 
 export interface ProdigiAsset {
   printArea: string
-  url: string
+  url?: string
 }
 
 export interface ProdigiOrderResponse {

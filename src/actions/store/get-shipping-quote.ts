@@ -19,7 +19,7 @@ export async function getShippingQuote(
         sku: item.prodigiSku,
         copies: item.quantity,
         attributes: { finish: "lustre" },
-        assets: [{ printArea: "default", url: "https://placeholder.com/test.jpg" }],
+        assets: [{ printArea: "default" }],
       })),
     })
 
