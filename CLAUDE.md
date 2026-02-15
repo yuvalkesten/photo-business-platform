@@ -143,6 +143,34 @@ import { prisma } from "@/lib/db"
 import { Button } from "@/components/ui/button"
 ```
 
+### Print Store Architecture
+
+Photographers sell physical prints (via Prodigi fulfillment) from client galleries. Stripe handles payments.
+
+**Checkout flow:**
+1. Customer adds items to cart (Zustand store with localStorage persistence)
+2. CartDrawer fetches live Prodigi shipping/tax quote on address entry (debounced 800ms)
+3. `createCheckout` server action validates prices against PriceSheet, calls Prodigi Quote API for real shipping/tax
+4. Creates StoreOrder with accurate pricing: subtotal (retail), shippingCost, taxAmount, totalAmount, prodigiCostTotal, photographerProfit
+5. Creates Stripe Checkout Session with product line items + shipping + tax as separate line items
+6. Stripe webhook (payment_intent.succeeded) → marks PAID → `submitOrderToProdigi()`
+7. Prodigi webhook → status updates (PROCESSING → SHIPPED → COMPLETE), tracking info
+
+**Key directories:**
+- `src/lib/prodigi/` — HTTP client, types, products, orders, quotes, webhooks, submit-order
+- `src/lib/stripe/` — Lazy proxy init client, checkout sessions, webhook verification
+- `src/stores/cart-store.ts` — Zustand cart with localStorage
+- `src/actions/store/` — Server actions: create-checkout, get-shipping-quote, store products, orders
+- `src/components/features/store/` — CartDrawer, product cards, store UI
+
+**Pricing model:**
+- Photographer sets retail prices via PriceSheet with markup over Prodigi base cost
+- Shipping/tax are pass-through from Prodigi (charged to customer at cost)
+- `photographerProfit` = retail subtotal - Prodigi item cost (excludes shipping/tax)
+- Server always validates prices against PriceSheet (never trusts client)
+
+**Public store actions don't require auth** (like other public gallery actions).
+
 ## Environment Variables Required
 
 - `DATABASE_URL` - Neon PostgreSQL connection string
@@ -150,7 +178,10 @@ import { Button } from "@/components/ui/button"
 - `NEXTAUTH_SECRET` - Session encryption secret
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` - Google OAuth
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET_NAME` - S3
+- `AWS_REKOGNITION_COLLECTION_PREFIX` - Rekognition face collection prefix (optional)
 - `GEMINI_API_KEY` - Gemini AI (email classification + photo analysis)
+- `STRIPE_SECRET_KEY` / `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` / `STRIPE_WEBHOOK_SECRET` - Stripe payments
+- `PRODIGI_API_KEY` / `PRODIGI_SANDBOX_API_KEY` / `PRODIGI_WEBHOOK_SECRET` - Prodigi fulfillment
 
 ### AI Photo Search Architecture
 
