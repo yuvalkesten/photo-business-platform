@@ -2,14 +2,20 @@
 
 ## Status: COMPLETED
 
-## Recent: Prodigi Quote API Integration (Feb 15, 2026)
-Integrated Prodigi Quote API into checkout flow so customers are charged real shipping/tax costs instead of $0. Previously the checkout only charged the retail price for items.
+## Recent: Prodigi Quote API Integration + SKU Fix (Feb 15, 2026)
+Integrated Prodigi Quote API into checkout flow and fixed all invalid product SKUs.
 
-### What changed:
-1. **`create-checkout.ts`**: Calls `getProdigiQuote()` before Stripe session creation. Extracts real shipping/tax, stores in StoreOrder, passes to Stripe as line items. Blocks checkout on quote failure.
-2. **`checkout.ts`**: Added `taxAmount` param → "Tax" line item in Stripe session alongside existing "Shipping" line item.
-3. **`CartDrawer.tsx`**: Debounced (800ms) shipping quote fetch on address entry. Shows subtotal/shipping/tax/total breakdown. Pay button shows full total. Quote errors disable checkout.
-4. **`get-shipping-quote.ts`**: Returns `tax` in quote response. Sends `attributes: { finish: "lustre" }` to match actual order params.
+### Quote integration:
+1. **`create-checkout.ts`**: Calls `getProdigiQuote()` before Stripe session. Extracts real shipping/tax, stores in StoreOrder, passes to Stripe.
+2. **`checkout.ts`**: Added `taxAmount` param → "Tax" line item in Stripe session.
+3. **`CartDrawer.tsx`**: Debounced (800ms) quote fetch on address entry. Shows subtotal/shipping/tax/total breakdown.
+4. **`get-shipping-quote.ts`**: Returns `tax` in quote response.
+
+### SKU + API response fixes:
+5. **`types.ts`**: Fixed `ProdigiQuoteResponse` to use actual API fields (`totalCost`/`totalTax` not `total`/`tax`). Added `getDefaultProdigiAttributes(sku)` helper.
+6. **Catalog SKUs**: Replaced invalid `GLOBAL-FRM-*` → `GLOBAL-CFP-*` (framed), removed `GLOBAL-MTL-*`/`GLOBAL-ACR-*` (don't exist), added `GLOBAL-FAP-*` (fine art).
+7. **Attributes**: Each product type requires specific attributes (photo→finish, canvas→wrap, frame→color). All quote/checkout/order code now uses the shared helper.
+8. **DB migration**: Added `FINE_ART` to `StoreProductCategory` enum.
 
 ## Previous: Print Store Feature (Feb 14, 2026)
 Full print store implementation for selling physical products (prints, canvas, framed prints) directly from client galleries. Uses Prodigi for fulfillment and Stripe for payments.

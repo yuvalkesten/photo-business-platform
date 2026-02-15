@@ -26,8 +26,7 @@ const CATEGORIES = [
   { value: "PRINT", label: "Prints" },
   { value: "CANVAS", label: "Canvas" },
   { value: "FRAMED_PRINT", label: "Framed" },
-  { value: "METAL_PRINT", label: "Metal" },
-  { value: "ACRYLIC", label: "Acrylic" },
+  { value: "FINE_ART", label: "Fine Art" },
 ]
 
 export function ProdigiCatalogBrowser({

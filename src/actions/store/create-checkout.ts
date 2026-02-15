@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db"
 import { createCheckoutSession } from "@/lib/stripe/checkout"
 import { getProdigiQuote } from "@/lib/prodigi/quotes"
+import { getDefaultProdigiAttributes } from "@/lib/prodigi/types"
 import { checkoutSchema } from "@/lib/validations/store.schema"
 import type { Prisma } from "@prisma/client"
 
@@ -110,7 +111,7 @@ export async function createCheckout(data: Record<string, unknown>) {
         items: orderItems.map((item) => ({
           sku: item.prodigiSku,
           copies: item.quantity,
-          attributes: { finish: "lustre" },
+          attributes: getDefaultProdigiAttributes(item.prodigiSku),
           assets: [{ printArea: "default" }],
         })),
       })
@@ -118,8 +119,8 @@ export async function createCheckout(data: Record<string, unknown>) {
       if (quoteResult.quotes.length > 0) {
         const quote = quoteResult.quotes[0]
         shippingCost = Number(quote.costSummary.shipping.amount)
-        taxAmount = quote.costSummary.tax ? Number(quote.costSummary.tax.amount) : 0
-        prodigiCostTotal = Number(quote.costSummary.total.amount)
+        taxAmount = Number(quote.costSummary.totalTax.amount)
+        prodigiCostTotal = Number(quote.costSummary.totalCost.amount)
       }
     } catch (quoteError) {
       console.error("Failed to get Prodigi quote, proceeding without shipping/tax:", quoteError)

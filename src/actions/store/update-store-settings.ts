@@ -12,13 +12,12 @@ const DEFAULT_PRODUCTS = [
   { sku: "GLOBAL-PHO-5x7-PRO", name: "Photo Print 5x7\"", size: "5x7\"", category: "PRINT" as const, cost: 1.25 },
   { sku: "GLOBAL-PHO-8x10-PRO", name: "Photo Print 8x10\"", size: "8x10\"", category: "PRINT" as const, cost: 2.50 },
   { sku: "GLOBAL-PHO-8x12-PRO", name: "Photo Print 8x12\"", size: "8x12\"", category: "PRINT" as const, cost: 3.00 },
-  { sku: "GLOBAL-PHO-11x14-PRO", name: "Photo Print 11x14\"", size: "11x14\"", category: "PRINT" as const, cost: 4.50 },
   { sku: "GLOBAL-PHO-16x20-PRO", name: "Photo Print 16x20\"", size: "16x20\"", category: "PRINT" as const, cost: 8.50 },
   { sku: "GLOBAL-CAN-12x16", name: "Canvas Print 12x16\"", size: "12x16\"", category: "CANVAS" as const, cost: 18.00 },
   { sku: "GLOBAL-CAN-16x20", name: "Canvas Print 16x20\"", size: "16x20\"", category: "CANVAS" as const, cost: 24.00 },
   { sku: "GLOBAL-CAN-24x36", name: "Canvas Print 24x36\"", size: "24x36\"", category: "CANVAS" as const, cost: 48.00 },
-  { sku: "GLOBAL-FRM-8x10-BLK", name: "Framed Print 8x10\"", size: "8x10\"", category: "FRAMED_PRINT" as const, cost: 22.00 },
-  { sku: "GLOBAL-FRM-16x20-BLK", name: "Framed Print 16x20\"", size: "16x20\"", category: "FRAMED_PRINT" as const, cost: 42.00 },
+  { sku: "GLOBAL-CFP-8X10", name: "Framed Print 8x10\"", size: "8x10\"", category: "FRAMED_PRINT" as const, cost: 35.00 },
+  { sku: "GLOBAL-CFP-16X20", name: "Framed Print 16x20\"", size: "16x20\"", category: "FRAMED_PRINT" as const, cost: 50.00 },
 ]
 
 export async function updateStoreSettings(data: unknown) {

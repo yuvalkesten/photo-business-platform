@@ -17,6 +17,7 @@ export const priceSheetItemSchema = z.object({
     "PRINT",
     "CANVAS",
     "FRAMED_PRINT",
+    "FINE_ART",
     "METAL_PRINT",
     "ACRYLIC",
     "PHOTO_BOOK",

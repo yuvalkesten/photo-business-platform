@@ -159,21 +159,33 @@ export interface ProdigiQuoteRequest {
 }
 
 export interface ProdigiQuoteResponse {
+  outcome: string
   quotes: {
     shipmentMethod: string
     costSummary: {
       items: { amount: string; currency: string }
       shipping: { amount: string; currency: string }
-      totalBeforeTax: { amount: string; currency: string }
-      tax: { amount: string; currency: string } | null
-      total: { amount: string; currency: string }
+      totalCost: { amount: string; currency: string }
+      totalTax: { amount: string; currency: string }
     }
     shipments: {
       carrier: { name: string; service: string }
       fulfillmentLocation: { countryCode: string; labCode: string }
-      items: { sku: string }[]
+      items: string[]
     }[]
   }[]
+}
+
+/**
+ * Returns the required default attributes for a Prodigi SKU.
+ * Photo prints need finish, canvas needs wrap, frames need color.
+ */
+export function getDefaultProdigiAttributes(sku: string): Record<string, string> {
+  const upper = sku.toUpperCase()
+  if (upper.startsWith("GLOBAL-PHO-")) return { finish: "lustre" }
+  if (upper.startsWith("GLOBAL-CAN-")) return { wrap: "ImageWrap" }
+  if (upper.startsWith("GLOBAL-CFP-") || upper.startsWith("GLOBAL-CFPM-")) return { color: "black" }
+  return {}
 }
 
 export interface ProdigiWebhookPayload {

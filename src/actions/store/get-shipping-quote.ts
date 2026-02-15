@@ -1,6 +1,7 @@
 "use server"
 
 import { getProdigiQuote } from "@/lib/prodigi/quotes"
+import { getDefaultProdigiAttributes } from "@/lib/prodigi/types"
 
 interface ShippingQuoteItem {
   prodigiSku: string
@@ -18,7 +19,7 @@ export async function getShippingQuote(
       items: items.map((item) => ({
         sku: item.prodigiSku,
         copies: item.quantity,
-        attributes: { finish: "lustre" },
+        attributes: getDefaultProdigiAttributes(item.prodigiSku),
         assets: [{ printArea: "default" }],
       })),
     })
@@ -26,9 +27,9 @@ export async function getShippingQuote(
     const quotes = quoteResult.quotes.map((q) => ({
       method: q.shipmentMethod,
       cost: Number(q.costSummary.shipping.amount),
-      tax: q.costSummary.tax ? Number(q.costSummary.tax.amount) : 0,
+      tax: Number(q.costSummary.totalTax.amount),
       currency: q.costSummary.shipping.currency,
-      total: Number(q.costSummary.total.amount),
+      total: Number(q.costSummary.totalCost.amount),
     }))
 
     return { success: true, quotes }

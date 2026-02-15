@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db"
 import { createProdigiOrder } from "./orders"
+import { getDefaultProdigiAttributes } from "./types"
 import type { ProdigiAddress, ProdigiOrderItem } from "./types"
 
 export async function submitOrderToProdigi(orderId: string) {
@@ -47,7 +48,7 @@ export async function submitOrderToProdigi(orderId: string) {
       sku: item.prodigiSku,
       copies: item.quantity,
       sizing: "fillPrintArea" as const,
-      attributes: { finish: "lustre" },
+      attributes: getDefaultProdigiAttributes(item.prodigiSku),
       assets: [
         {
           printArea: "default",

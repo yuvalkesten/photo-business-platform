@@ -50,8 +50,7 @@ export function StoreTab({
     PRINT: "Prints",
     CANVAS: "Canvas",
     FRAMED_PRINT: "Framed Prints",
-    METAL_PRINT: "Metal Prints",
-    ACRYLIC: "Acrylic Prints",
+    FINE_ART: "Fine Art Prints",
     PHOTO_BOOK: "Photo Albums",
   }
 

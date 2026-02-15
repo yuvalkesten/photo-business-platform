@@ -38,8 +38,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   PRINT: "Prints",
   CANVAS: "Canvas",
   FRAMED_PRINT: "Framed Prints",
-  METAL_PRINT: "Metal Prints",
-  ACRYLIC: "Acrylic",
+  FINE_ART: "Fine Art Prints",
   PHOTO_BOOK: "Photo Books",
 }
 
