@@ -18,6 +18,7 @@ export async function getShippingQuote(
       items: items.map((item) => ({
         sku: item.prodigiSku,
         copies: item.quantity,
+        attributes: { finish: "lustre" },
         assets: [{ printArea: "default", url: "https://placeholder.com/test.jpg" }],
       })),
     })
@@ -25,6 +26,7 @@ export async function getShippingQuote(
     const quotes = quoteResult.quotes.map((q) => ({
       method: q.shipmentMethod,
       cost: Number(q.costSummary.shipping.amount),
+      tax: q.costSummary.tax ? Number(q.costSummary.tax.amount) : 0,
       currency: q.costSummary.shipping.currency,
       total: Number(q.costSummary.total.amount),
     }))

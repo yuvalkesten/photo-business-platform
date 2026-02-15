@@ -15,6 +15,7 @@ interface CreateCheckoutParams {
   customerEmail: string
   lineItems: CheckoutLineItem[]
   shippingCost: number // in cents
+  taxAmount: number // in cents
   successUrl: string
   cancelUrl: string
   metadata?: Record<string, string>
@@ -46,6 +47,20 @@ export async function createCheckoutSession(
           name: "Shipping",
         },
         unit_amount: params.shippingCost,
+      },
+      quantity: 1,
+    })
+  }
+
+  // Add tax as a line item
+  if (params.taxAmount > 0) {
+    lineItems.push({
+      price_data: {
+        currency: "usd",
+        product_data: {
+          name: "Tax",
+        },
+        unit_amount: params.taxAmount,
       },
       quantity: 1,
     })

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator"
 import { ShoppingCart, Trash2, Minus, Plus, Loader2 } from "lucide-react"
 import { useCartStore } from "@/stores/cart-store"
 import { createCheckout } from "@/actions/store/create-checkout"
+import { getShippingQuote } from "@/actions/store/get-shipping-quote"
 
 interface CartDrawerProps {
   open: boolean
@@ -44,14 +45,81 @@ export function CartDrawer({
   const country = "US"
   const [error, setError] = useState<string | null>(null)
 
+  // Shipping quote state
+  const [shippingCost, setShippingCost] = useState<number | null>(null)
+  const [taxAmount, setTaxAmount] = useState<number | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
+  const [quoteError, setQuoteError] = useState<string | null>(null)
+  const quoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const subtotal = getSubtotal()
+  const hasQuote = shippingCost !== null
+  const total = hasQuote ? subtotal + (shippingCost ?? 0) + (taxAmount ?? 0) : null
+
+  const hasAddress = postalCode.trim().length >= 5 && city.trim() && addressLine1.trim()
   const canCheckout =
     items.length > 0 &&
     customerName.trim() &&
     customerEmail.trim() &&
-    addressLine1.trim() &&
-    city.trim() &&
-    postalCode.trim()
+    hasAddress &&
+    hasQuote &&
+    !quoteError
+
+  // Fetch shipping quote when address or items change
+  const fetchQuote = useCallback(async () => {
+    if (items.length === 0 || !hasAddress) {
+      setShippingCost(null)
+      setTaxAmount(null)
+      setQuoteError(null)
+      return
+    }
+
+    setQuoteLoading(true)
+    setQuoteError(null)
+
+    const result = await getShippingQuote(
+      country,
+      items.map((item) => ({
+        prodigiSku: item.prodigiSku,
+        quantity: item.quantity,
+      }))
+    )
+
+    if (result.error) {
+      setQuoteError("Unable to calculate shipping. Please check your address.")
+      setShippingCost(null)
+      setTaxAmount(null)
+    } else if (result.quotes && result.quotes.length > 0) {
+      setShippingCost(result.quotes[0].cost)
+      setTaxAmount(result.quotes[0].tax)
+      setQuoteError(null)
+    }
+
+    setQuoteLoading(false)
+  }, [items, hasAddress, country])
+
+  // Debounce quote fetching — trigger when address fields or items change
+  useEffect(() => {
+    if (quoteTimerRef.current) {
+      clearTimeout(quoteTimerRef.current)
+    }
+
+    if (!hasAddress || items.length === 0) {
+      setShippingCost(null)
+      setTaxAmount(null)
+      return
+    }
+
+    quoteTimerRef.current = setTimeout(() => {
+      fetchQuote()
+    }, 800)
+
+    return () => {
+      if (quoteTimerRef.current) {
+        clearTimeout(quoteTimerRef.current)
+      }
+    }
+  }, [fetchQuote])
 
   const handleCheckout = async () => {
     if (!canCheckout) return
@@ -262,12 +330,44 @@ export function CartDrawer({
             {/* Footer with total + checkout */}
             <div className="border-t pt-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="font-medium">Subtotal</span>
-                <span className="text-lg font-semibold">${subtotal.toFixed(2)}</span>
+                <span className="text-sm text-muted-foreground">Subtotal</span>
+                <span className="text-sm">${subtotal.toFixed(2)}</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Shipping and tax calculated at checkout
-              </p>
+
+              {quoteLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Calculating shipping...
+                </div>
+              ) : hasQuote ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Shipping</span>
+                    <span className="text-sm">
+                      {shippingCost === 0 ? "Free" : `$${shippingCost!.toFixed(2)}`}
+                    </span>
+                  </div>
+                  {(taxAmount ?? 0) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Tax</span>
+                      <span className="text-sm">${taxAmount!.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Total</span>
+                    <span className="text-lg font-semibold">${total!.toFixed(2)}</span>
+                  </div>
+                </>
+              ) : !hasAddress ? (
+                <p className="text-xs text-muted-foreground">
+                  Enter your address to calculate shipping
+                </p>
+              ) : null}
+
+              {quoteError && (
+                <p className="text-sm text-destructive">{quoteError}</p>
+              )}
 
               {error && (
                 <p className="text-sm text-destructive">{error}</p>
@@ -285,6 +385,8 @@ export function CartDrawer({
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Processing...
                   </>
+                ) : total !== null ? (
+                  `Pay $${total.toFixed(2)}`
                 ) : (
                   `Pay $${subtotal.toFixed(2)}`
                 )}

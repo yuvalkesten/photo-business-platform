@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db"
 import { createCheckoutSession } from "@/lib/stripe/checkout"
+import { getProdigiQuote } from "@/lib/prodigi/quotes"
 import { checkoutSchema } from "@/lib/validations/store.schema"
 import type { Prisma } from "@prisma/client"
 
@@ -61,7 +62,7 @@ export async function createCheckout(data: Record<string, unknown>) {
     )
 
     let subtotal = 0
-    let prodigiCostTotal = 0
+    let prodigiCostTotal = 0 // Will be updated by Prodigi quote
     const orderItems: {
       photoId: string
       prodigiSku: string
@@ -99,8 +100,35 @@ export async function createCheckout(data: Record<string, unknown>) {
       })
     }
 
+    // Get shipping/tax quote from Prodigi
+    let shippingCost = 0
+    let taxAmount = 0
+    try {
+      const quoteResult = await getProdigiQuote({
+        shippingMethod: "Standard",
+        destinationCountryCode: validated.shippingAddress.country,
+        items: orderItems.map((item) => ({
+          sku: item.prodigiSku,
+          copies: item.quantity,
+          attributes: { finish: "lustre" },
+          assets: [{ printArea: "default", url: "https://placeholder.com/test.jpg" }],
+        })),
+      })
+
+      if (quoteResult.quotes.length > 0) {
+        const quote = quoteResult.quotes[0]
+        shippingCost = Number(quote.costSummary.shipping.amount)
+        taxAmount = quote.costSummary.tax ? Number(quote.costSummary.tax.amount) : 0
+        prodigiCostTotal = Number(quote.costSummary.total.amount)
+      }
+    } catch (quoteError) {
+      console.error("Failed to get Prodigi quote, proceeding without shipping/tax:", quoteError)
+      return { error: "Unable to calculate shipping costs. Please try again." }
+    }
+
+    const totalAmount = subtotal + shippingCost + taxAmount
+    const photographerProfit = subtotal - (prodigiCostTotal - shippingCost - taxAmount)
     const orderNumber = generateOrderNumber()
-    const photographerProfit = subtotal - prodigiCostTotal
 
     // Create StoreOrder
     const order = await prisma.storeOrder.create({
@@ -111,10 +139,13 @@ export async function createCheckout(data: Record<string, unknown>) {
         customerEmail: validated.customerEmail,
         customerName: validated.customerName,
         subtotal: subtotal as unknown as Prisma.Decimal,
-        totalAmount: subtotal as unknown as Prisma.Decimal, // Will be updated after Stripe adds tax
+        shippingCost: shippingCost as unknown as Prisma.Decimal,
+        taxAmount: taxAmount as unknown as Prisma.Decimal,
+        totalAmount: totalAmount as unknown as Prisma.Decimal,
         prodigiCostTotal: prodigiCostTotal as unknown as Prisma.Decimal,
         photographerProfit: photographerProfit as unknown as Prisma.Decimal,
         shippingAddress: JSON.parse(JSON.stringify(validated.shippingAddress)) as Prisma.InputJsonValue,
+        shippingMethod: "Standard",
         status: "PENDING_PAYMENT",
         items: {
           create: orderItems.map((item) => ({
@@ -151,7 +182,8 @@ export async function createCheckout(data: Record<string, unknown>) {
         unitAmount: Math.round(item.unitPrice * 100), // cents
         quantity: item.quantity,
       })),
-      shippingCost: 0, // TODO: integrate Prodigi quote
+      shippingCost: Math.round(shippingCost * 100), // cents
+      taxAmount: Math.round(taxAmount * 100), // cents
       successUrl,
       cancelUrl,
       metadata: {
