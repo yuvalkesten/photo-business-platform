@@ -16,6 +16,7 @@ Integrated Prodigi Quote API into checkout flow and fixed all invalid product SK
 6. **Catalog SKUs**: Replaced invalid `GLOBAL-FRM-*` → `GLOBAL-CFP-*` (framed), removed `GLOBAL-MTL-*`/`GLOBAL-ACR-*` (don't exist), added `GLOBAL-FAP-*` (fine art).
 7. **Attributes**: Each product type requires specific attributes (photo→finish, canvas→wrap, frame→color). All quote/checkout/order code now uses the shared helper.
 8. **DB migration**: Added `FINE_ART` to `StoreProductCategory` enum.
+9. **Data migration**: Replaced invalid SKUs in existing price sheets (FRM→CFP, MTL→FAP, removed ACR/PHO-11x14-PRO).
 
 ## Previous: Print Store Feature (Feb 14, 2026)
 Full print store implementation for selling physical products (prints, canvas, framed prints) directly from client galleries. Uses Prodigi for fulfillment and Stripe for payments.
